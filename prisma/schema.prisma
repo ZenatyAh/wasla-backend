@@ -16,39 +16,39 @@ datasource db {
 // 1. Users Table
 // ----------------------------------------------------------------------
 model User {
-  id                Int       @id @default(autoincrement())
-  full_name         String
-  username          String    @unique
-  email             String    @unique
-  password_hash     String
-  bio               String?   // ? يعني أن الحقل اختياري (Nullable)
-  profile_image     String?
+  id            Int     @id @default(autoincrement())
+  full_name     String
+  username      String  @unique
+  email         String  @unique
+  password_hash String
+  bio           String? // ? يعني أن الحقل اختياري (Nullable)
+  profile_image String?
 
-  available_balance Int       @default(5)
-  escrow_balance    Int       @default(0)
+  available_balance Int @default(5)
+  escrow_balance    Int @default(0)
 
-  created_at        DateTime  @default(now())
-  updated_at        DateTime  @updatedAt
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   // العلاقات (Relations) - كيف يرتبط المستخدم بالجداول الأخرى
-  skills            UserSkill[]
+  skills UserSkill[]
 
   // حركات تم إرسالها أو استلامها بواسطة هذا المستخدم
-    sent_transactions     Transaction[] @relation("Sender")
-    received_transactions Transaction[] @relation("Receiver")
+  sent_transactions     Transaction[] @relation("Sender")
+  received_transactions Transaction[] @relation("Receiver")
 
-@@map("users") // لتسمية الجدول الفعلي في الداتابيز بحروف صغيرة
+  @@map("users") // لتسمية الجدول الفعلي في الداتابيز بحروف صغيرة
 }
 
 // ----------------------------------------------------------------------
 // 2. Skills Table (القائمة المرجعية للمهارات)
 // ----------------------------------------------------------------------
 model Skill {
-  id         Int         @id @default(autoincrement())
-  skill_name String      @unique
-  
+  id         Int    @id @default(autoincrement())
+  skill_name String @unique
+
   // العلاقات
-  users      UserSkill[]
+  users UserSkill[]
 
   @@map("skills")
 }
@@ -67,12 +67,12 @@ model UserSkill {
   user_id    Int
   skill_id   Int
   skill_type SkillType
-  
-  created_at DateTime  @default(now())
+
+  created_at DateTime @default(now())
 
   // ربط المفاتيح الأجنبية (Foreign Keys)
-  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  skill      Skill     @relation(fields: [skill_id], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skill_id], references: [id], onDelete: Cascade)
 
   // لضمان عدم تكرار نفس المهارة لنفس المستخدم بنفس النوع (كعرض أو طلب)
   @@unique([user_id, skill_id, skill_type])
@@ -90,23 +90,23 @@ enum TransactionType {
 }
 
 model Transaction {
-  id                    Int             @id @default(autoincrement())
-  
+  id Int @id @default(autoincrement())
+
   // المُستلِم (دائماً موجود)
-  receiver_id           Int
-  receiver              User            @relation("Receiver", fields: [receiver_id], references: [id])
-  
+  receiver_id Int
+  receiver    User @relation("Receiver", fields: [receiver_id], references: [id])
+
   // المُرسِل (قد يكون Null في حالة هدية التسجيل)
-  sender_id             Int?
-  sender                User?           @relation("Sender", fields: [sender_id], references: [id])
-  
-  amount                Int
-  transaction_type      TransactionType
-  
+  sender_id Int?
+  sender    User? @relation("Sender", fields: [sender_id], references: [id])
+
+  amount           Int
+  transaction_type TransactionType
+
   // مرجعية العقد (ستضيف علاقة العقد لاحقاً، حالياً سنكتفي بالرقم)
-  reference_contract_id Int?            // سنربطها بجدول Contract لاحقاً عندما ننشئه
-  
-  created_at            DateTime        @default(now())
+  reference_contract_id Int? // سنربطها بجدول Contract لاحقاً عندما ننشئه
+
+  created_at DateTime @default(now())
 
   @@map("transactions")
 }
