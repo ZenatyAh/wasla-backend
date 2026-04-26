@@ -16,19 +16,20 @@ datasource db {
 // 1. Users Table
 // ----------------------------------------------------------------------
 model User {
-  id            Int     @id @default(autoincrement())
-  full_name     String
-  username      String  @unique
-  email         String  @unique
-  password_hash String
-  bio           String? // ? يعني أن الحقل اختياري (Nullable)
-  profile_image String?
-
-  available_balance Int @default(5)
-  escrow_balance    Int @default(0)
+  id                Int     @id @default(autoincrement())
+  full_name         String
+  username          String  @unique
+  email             String  @unique
+  password_hash     String
+  bio               String? // ? يعني أن الحقل اختياري (Nullable)
+  profile_image     String?
+  location          String?
+  available_balance Int     @default(5)
+  escrow_balance    Int     @default(0)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+  is_verfied Boolean  @default(false)
 
   // العلاقات (Relations) - كيف يرتبط المستخدم بالجداول الأخرى
   skills UserSkill[]
@@ -36,6 +37,7 @@ model User {
   // حركات تم إرسالها أو استلامها بواسطة هذا المستخدم
   sent_transactions     Transaction[] @relation("Sender")
   received_transactions Transaction[] @relation("Receiver")
+  sessions              session[]
 
   @@map("users") // لتسمية الجدول الفعلي في الداتابيز بحروف صغيرة
 }
@@ -109,4 +111,17 @@ model Transaction {
   created_at DateTime @default(now())
 
   @@map("transactions")
+}
+
+model session {
+  id            String   @id
+  refresh_token String   @unique
+  user_id       Int
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  device_info   String
+  ip_address    String?
+  expires_at    DateTime
+  is_revoked    Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime
 }
