@@ -23,8 +23,8 @@ export const RegisterService = async (
     throw new Error(`Password should be at least 8 characters`);
   }
   // 2 - email
-  const checkEmail = await prisma.user.findFirst({
-    where: { email: email },
+  const checkEmail = await prisma.user.findUnique({
+    where: { email },
   });
   if (checkEmail) {
     throw new Error(`Email already used`);
@@ -32,7 +32,7 @@ export const RegisterService = async (
 
   // 3 - username
   const checkUserName = await prisma.user.findUnique({
-    where: { username: username },
+    where: { username },
   });
   if (checkUserName) {
     throw new Error(`Username is already taken`);
@@ -52,10 +52,12 @@ export const RegisterService = async (
       profile_image: profile_image ?? null,
     },
   });
-  const refreshToken = await createSession(user.id, meta);
+  const { refreshToken, accessToken } = await createSession(user.id, meta);
   return {
     id: user.id,
     email: user.email,
     username: user.username,
+    refreshToken,
+    accessToken,
   };
 };

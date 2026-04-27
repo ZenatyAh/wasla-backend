@@ -1,5 +1,4 @@
 import { prisma } from "../../lib/prisma.js";
-import { signAccessToken, RefreshAccessToken } from "../../common/utils/jwt.js";
 import bcrypt from "bcrypt";
 import { createSession } from "./Register/create_session.js";
 // Function Controller
@@ -31,7 +30,7 @@ export const loginService = async (data: any, meta: any) => {
   }
 
   // 4. Check email verification
-  if (!user.is_verfied) {
+  if (!user.is_verified) {
     // return res
     //   .status(403)
     //   .json({ message: `Please verify your email first` });
@@ -39,13 +38,12 @@ export const loginService = async (data: any, meta: any) => {
   }
 
   // 5. Generate tokens
-  const Accesstoken = await signAccessToken(user.id.toString());
-  const refreshToken = await createSession(user.id, meta);
+  const { refreshToken, accessToken } = await createSession(user.id, meta);
 
   // Send data for controllers
   return {
-    Accesstoken,
     refreshToken,
+    accessToken,
     user: {
       id: user.id,
       email: user.email,
