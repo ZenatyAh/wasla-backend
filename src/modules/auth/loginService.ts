@@ -30,12 +30,12 @@ export const loginService = async (data: any, meta: any) => {
   }
 
   // 4. Check email verification
-  if (!user.is_verified) {
-    // return res
-    //   .status(403)
-    //   .json({ message: `Please verify your email first` });
-    throw new Error(`Please verify your email first`);
-  }
+  // if (!user.is_verified) {
+  //   // return res
+  //   //   .status(403)
+  //   //   .json({ message: `Please verify your email first` });
+  //   throw new Error(`Please verify your email first`);
+  // }
 
   // 5. Generate tokens
   const { refreshToken, accessToken } = await createSession(user.id, meta);
