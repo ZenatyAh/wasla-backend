@@ -1,3 +1,18 @@
-node_modules
+node_modules/
+dist/
+.env
 
-/src/generated/prisma
+src/generated/prisma/
+
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts
+src/**/*.d.ts.map
+
+prisma.config.js
+prisma.config.js.map
+prisma.config.d.ts
+prisma.config.d.ts.map
+
+.codex
+*.log
