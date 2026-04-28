@@ -5,12 +5,7 @@ import { ZodObject, ZodError } from "zod";
 const validate =
   (schema: ZodObject) => (req: Request, res: Response, next: NextFunction) => {
     try {
-      // نقوم بفحص Body, Query, و Params معاً لضمان تغطية شاملة
-      schema.parse({
-        body: req.body,
-        query: req.query,
-        params: req.params,
-      });
+      schema.parse(req.body);
 
       next(); // إذا نجح التحقق، انتقل للـ Controller
     } catch (e: any) {
@@ -19,7 +14,7 @@ const validate =
         return res.status(400).json({
           status: "fail",
           errors: e.issues.map((err) => ({
-            path: err.path[1], // اسم الحقل الذي فيه الخطأ
+            path: err.path[0],
             message: err.message,
           })),
         });
