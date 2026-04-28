@@ -3,7 +3,7 @@ import express from "express";
 import { authMiddleware } from "./common/middleware/auth.middleware.js";
 const app = express();
 import authroutes from "./modules/auth/auth.routes.js";
-
+import "./types/express.js";
 app.use(cors());
 app.use(express.json());
 
