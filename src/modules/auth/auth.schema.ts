@@ -1,4 +1,12 @@
-import { z } from "zod";
+import { email, z } from "zod";
+
+export const loginschema = z.object({
+  email: z.string().email("Invalid email format"),
+  password: z
+    .string()
+    .min(8, "Password is too short")
+    .max(50, "Password is too long"),
+});
 
 export const registerSchema = z.object({
   full_name: z
@@ -11,7 +19,7 @@ export const registerSchema = z.object({
     .min(5, "Username must be at least 5 characters")
     .max(15, "Username must not exceed 15 characters"),
 
-  email: z.string().email("Invalid email format"), // التعديل هنا
+  email: z.string().email("Invalid email format"),
 
   password: z
     .string()
@@ -30,3 +38,4 @@ export const registerSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+export type LoginInput = z.infer<typeof loginschema>;
