@@ -1,11 +1,11 @@
 import type { Request, Response } from "express";
 import { RegisterService } from "./Register.service.js";
 import { metaExtract } from "../../../common/utils/meta.js";
-
+import type {RegisterInput} from '../auth.schema.js'
 export const RegisterControler = async (req: Request, res: Response) => {
   try {
     const meta = await metaExtract(req);
-    const data = req.body;
+    const data : RegisterInput = req.body;
     if (!data) {
       return res.status(400).json({ message: `data Not Found` });
     }

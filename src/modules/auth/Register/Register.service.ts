@@ -1,27 +1,23 @@
 import { prisma } from "../../../lib/prisma.js";
 import bcrypt from "bcrypt";
 import { createSession } from "./create_session.js";
-type data = {
-  password: string;
-  email: string;
-  username: string;
-  full_name: string;
-  bio?: string;
-  profile_image?: string;
-};
+import type { RegisterInput } from "../auth.schema.js";
+
 export const RegisterService = async (
-  data: data,
+  data: RegisterInput,
   meta: { deviceInfo: string; ip: string },
 ) => {
-  const { username, email, password, full_name, bio, profile_image } = data;
-  // Validation
-  if (!email || !password || !username) {
-    throw new Error(`All fields are required`);
-  }
-  // 1 - password
-  if (!password || password.length < 8) {
-    throw new Error(`Password should be at least 8 characters`);
-  }
+  const {
+    username,
+    email,
+    password,
+    full_name,
+    bio,
+    profile_image,
+    offeredSkills,
+    requiredSkills,
+  } = data;
+
   // 2 - email
   const checkEmail = await prisma.user.findUnique({
     where: { email },
@@ -41,17 +37,70 @@ export const RegisterService = async (
   // Hash Password
   const hashPassword = await bcrypt.hash(password, 10);
 
-  // CREAT User
-  const user = await prisma.user.create({
-    data: {
-      full_name,
-      username,
-      email,
-      password_hash: hashPassword,
-      bio: bio ?? null,
-      profile_image: profile_image ?? null,
-    },
+  // create skills
+  const user = await prisma.$transaction(async (tx) => {
+    // CREAT User
+    const user = await tx.user.create({
+      data: {
+        full_name,
+        username,
+        email,
+        password_hash: hashPassword,
+        bio: bio ?? null,
+        profile_image: profile_image ?? null,
+      },
+    });
+
+    for (const skillName of offeredSkills) {
+      const skill = await tx.skill.upsert({
+        where: { skill_name: skillName },
+        update: {},
+        create: { skill_name: skillName },
+      });
+
+      await tx.userSkill.upsert({
+        where: {
+          user_id_skill_id_skill_type: {
+            user_id: user.id,
+            skill_id: skill.id,
+            skill_type: "OFFER",
+          },
+        },
+        update: {},
+        create: {
+          user_id: user.id,
+          skill_id: skill.id,
+          skill_type: "OFFER",
+        },
+      });
+    }
+
+    for (const skillName of requiredSkills) {
+      const skill = await tx.skill.upsert({
+        where: { skill_name: skillName },
+        update: {},
+        create: { skill_name: skillName },
+      });
+
+      await tx.userSkill.upsert({
+        where: {
+          user_id_skill_id_skill_type: {
+            user_id: user.id,
+            skill_id: skill.id,
+            skill_type: "NEED",
+          },
+        },
+        update: {},
+        create: {
+          user_id: user.id,
+          skill_id: skill.id,
+          skill_type: "NEED",
+        },
+      });
+    }
+    return user;
   });
+
   const { refreshToken, accessToken } = await createSession(user.id, meta);
   return {
     id: user.id,
