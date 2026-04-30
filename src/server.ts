@@ -6,7 +6,7 @@ import authroutes from "./modules/auth/auth.routes.js";
 // import "./types/express.js";
 app.use(cors());
 app.use(express.json());
-
+app.set("trust proxy", 1);
 app.get("/", (_req, res) => {
   res.json({
     message: "Wasla backend is running , Ahmed Zenaty Here",
