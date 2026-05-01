@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const emailSchema = z.string().trim().email("Invalid email format");
+export const emailSchema = z.string().trim().email("Invalid email format");
 const passwordSchema = z
   .string()
   .min(8, "Password is too short")
