@@ -1,10 +1,14 @@
 import { z } from "zod";
 
-const emailSchema = z.string().email("Invalid email format");
+const emailSchema = z.string().trim().email("Invalid email format");
 const passwordSchema = z
   .string()
   .min(8, "Password is too short")
-  .max(50, "Password is too long");
+  .max(50, "Password is too long")
+  .regex(/[A-Z]/, "يجب أن تحتوي على حرف كبير واحد على الأقل")
+  .regex(/[a-z]/, "يجب أن تحتوي على حرف صغير واحد على الأقل")
+  .regex(/[0-9]/, "يجب أن تحتوي على رقم واحد على الأقل")
+  .regex(/[^A-Za-z0-9]/, "يجب أن تحتوي على رمز خاص واحد على الأقل (@#$...)");
 const skillsArray = z
   .array(z.string().min(2))
   .min(5)
@@ -19,13 +23,28 @@ export const loginschema = z.object({
 });
 
 export const registerSchema = z.object({
-  full_name: z.string().min(15).max(40),
-  username: z.string().min(5).max(15),
+  full_name: z
+    .string()
+    .min(3)
+    .max(40)
+    .regex(
+      /^[a-zA-Z\u0600-\u06FF\s]+$/,
+      "الاسم يجب أن يحتوي على حروف فقط وبدون أرقام",
+    ),
+  username: z
+    .string()
+    .trim()
+    .min(3)
+    .max(50)
+    .regex(
+      /^(?=(.*[a-zA-Z]){3,})[a-zA-Z0-9\d\W_]+$/,
+      "يجب أن يحتوي اسم المستخدم على 3 حروف إنجليزية على الأقل، ويمكنك استخدام الأرقام والرموز",
+    ),
   email: emailSchema,
   password: passwordSchema,
   bio: z.string().min(50).max(200).optional().or(z.literal("")), // يقبل اختياري أو نص فارغ
   profile_image: z.string().url().optional(),
-  location: z.string().optional(),
+  location: z.string().min(3, "choose correct city name").optional(),
   offeredSkills: skillsArray,
   requiredSkills: skillsArray,
 });

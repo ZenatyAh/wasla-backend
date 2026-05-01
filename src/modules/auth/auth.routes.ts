@@ -7,5 +7,5 @@ import { loginLimite } from "../../common/middleware/ratelimi.js";
 const router = Router();
 router.post("/login", loginLimite, validate(loginschema), loginController);
 router.post("/register", validate(registerSchema), RegisterControler);
-
+router.post("forget-Password");
 export default router;
