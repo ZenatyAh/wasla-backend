@@ -1,9 +1,12 @@
-import crypto, { hash } from "crypto";
+import crypto from "crypto";
+import { TOKEN_SECRET } from "./env.js";
 export const generateToken = () => {
-  const resetToken = crypto.randomBytes(32).toString("hex");
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(resetToken)
+  const TOKEN_EXPIRES_IN = 15 * 60 * 1000;
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto
+    .createHmac("sha256", TOKEN_SECRET)
+    .update(token)
     .digest("hex");
-  const expireDate = new Date(Date.now() + 15 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + TOKEN_EXPIRES_IN);
+  return { token, tokenHash, expiresAt };
 };
