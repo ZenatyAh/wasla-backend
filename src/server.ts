@@ -4,6 +4,8 @@ import { authMiddleware } from "./common/middleware/auth.middleware.js";
 import { openApiSpec } from "./docs/openapi.js";
 import { swaggerHtml } from "./docs/swaggerHtml.js";
 const app = express();
+export default app;
+
 import authroutes from "./modules/auth/auth.routes.js";
 // import "./types/express.js";
 app.use(cors());
@@ -43,5 +45,3 @@ app.use((_req, res) => {
     message: "Route not found",
   });
 });
-
-export default app;
