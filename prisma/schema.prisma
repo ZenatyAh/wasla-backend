@@ -40,9 +40,10 @@ model User {
   skills UserSkill[]
 
   // حركات تم إرسالها أو استلامها بواسطة هذا المستخدم
-  sent_transactions     Transaction[] @relation("Sender")
-  received_transactions Transaction[] @relation("Receiver")
+  sent_transactions     Transaction[]        @relation("Sender")
+  received_transactions Transaction[]        @relation("Receiver")
   sessions              session[]
+  passwordResetTokens   PasswordResetToken[]
 
   @@map("users") // لتسمية الجدول الفعلي في الداتابيز بحروف صغيرة
 }
@@ -129,4 +130,21 @@ model session {
   is_revoked    Boolean  @default(false)
   created_at    DateTime @default(now())
   updated_at    DateTime
+}
+
+model PasswordResetToken {
+  id String @id @default(cuid())
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String   @db.VarChar(255)
+  expiresAt DateTime
+
+  usedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([tokenHash])
 }

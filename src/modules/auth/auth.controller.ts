@@ -1,21 +1,20 @@
 import type { Response, Request } from "express";
 import { loginService } from "./loginService.js";
 import { metaExtract } from "../../common/utils/meta.js";
+import { setRefreshTokenCookie } from "../../common/utils/cookies.js";
+import { getErrorMessage, sendError } from "../../common/utils/httpError.js";
+
 export const loginController = async (req: Request, res: Response) => {
   try {
     const meta = await metaExtract(req);
     const result = await loginService(req.body, meta);
-    // Set Cookies
-    res.cookie("refreshToken", result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-    });
+    setRefreshTokenCookie(res, result.refreshToken);
+
     return res.json({
-      access_Token: result.accessToken,
+      accessToken: result.accessToken,
       user: result.user,
     });
-  } catch (err: any) {
-    return res.status(400).json({ message: err.message || "Login Faild" });
+  } catch (err: unknown) {
+    return sendError(res, 400, getErrorMessage(err, "Login failed"));
   }
 };

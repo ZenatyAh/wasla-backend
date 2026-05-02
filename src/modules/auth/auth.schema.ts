@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-const emailSchema = z.string().trim().email("Invalid email format");
-const passwordSchema = z
+export const emailSchema = z.string().trim().email("Invalid email format");
+export const passwordSchema = z
   .string()
   .min(8, "Password is too short")
   .max(50, "Password is too long")
@@ -20,6 +20,11 @@ const skillsArray = z
 export const loginschema = z.object({
   email: emailSchema,
   password: passwordSchema,
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().trim().min(1, "Reset token is required"),
+  newPassword: passwordSchema,
 });
 
 export const registerSchema = z.object({
@@ -51,3 +56,4 @@ export const registerSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginschema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

@@ -7,7 +7,6 @@ export const authMiddleware = (
   next: NextFunction,
 ) => {
   try {
-    // Extract Acceess Token
     const authHeader = req.headers.authorization;
     let token;
 
@@ -20,11 +19,10 @@ export const authMiddleware = (
     if (!token) {
       return res.status(401).json({ message: "Invalid or expired token" });
     }
-    // verify token
     const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
-    req.user = payload;
+    (req as Request & { user?: unknown }).user = payload;
     return next();
   } catch {
-    return res.status(401).json({ message: "401 Invalid or expired token" });
+    return res.status(401).json({ message: "Invalid or expired token" });
   }
 };
