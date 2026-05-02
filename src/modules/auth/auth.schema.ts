@@ -11,7 +11,7 @@ export const passwordSchema = z
   .regex(/[^A-Za-z0-9]/, "يجب أن تحتوي على رمز خاص واحد على الأقل (@#$...)");
 const skillsArray = z
   .array(z.string().min(2))
-  .min(5)
+  .min(1)
   .max(10)
   .refine((items) => new Set(items).size === items.length, {
     message: "Array contains duplicate values; each item must be unique",
