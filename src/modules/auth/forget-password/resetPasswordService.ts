@@ -12,7 +12,6 @@ export const resetPasswordService = async (
     .digest("hex");
 
   await prisma.$transaction(async (tx) => {
-    // 🔥 atomic consume
     const result = await tx.passwordResetToken.updateMany({
       where: {
         tokenHash,

@@ -1,9 +1,8 @@
-import { env } from "prisma/config";
 import { JWT_SECRET } from "../../common/utils/env.js";
 import jwt from "jsonwebtoken";
 import { signAccessToken, RefreshAccessToken } from "../../common/utils/jwt.js";
 import { prisma } from "../../lib/prisma.js";
-export const refreshService = async (refreshToken: string) => {
+export const refreshService = async (refreshToken?: string) => {
   // 1 - check if refreshToken found
   if (!refreshToken) {
     throw new Error(`No refresh token`);
@@ -31,8 +30,8 @@ export const refreshService = async (refreshToken: string) => {
   }
 
   // 5 - generate new tokens (ROTATION)
-  const newAccessToken = signAccessToken(payload.user_id);
-  const newRefreshToken = RefreshAccessToken(payload.user_id);
+  const newAccessToken = signAccessToken(payload.userId);
+  const newRefreshToken = RefreshAccessToken(payload.userId);
 
   //   6 - update session (invalidate old token)
   await prisma.session.update({

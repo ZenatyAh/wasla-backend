@@ -22,6 +22,6 @@ export const createSession = async (userId: number, meta: any) => {
     });
     return { refreshToken, accessToken };
   } catch (err: any) {
-    throw new Error("Login Faild");
+    throw new Error("Session creation failed");
   }
 };

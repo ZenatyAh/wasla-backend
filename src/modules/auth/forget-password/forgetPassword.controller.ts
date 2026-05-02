@@ -1,4 +1,5 @@
 import { emailSchema } from "../auth.schema.js";
+import { getErrorMessage, sendError } from "../../../common/utils/httpError.js";
 import { forgetPasswordService } from "./forgetPassword.service.js";
 export const forgetPasswordControllers = async (req: any, res: any) => {
   try {
@@ -10,11 +11,7 @@ export const forgetPasswordControllers = async (req: any, res: any) => {
     return res
       .status(200)
       .json({ message: "If the email exists, we sent a reset link" });
-  } catch (error: any) {
-    return res.status(400).json({
-      status: "fail",
-      message: "بيانات غير صالحة",
-      errors: error.errors,
-    });
+  } catch (err: unknown) {
+    return sendError(res, 400, getErrorMessage(err, "Invalid request data"));
   }
 };
