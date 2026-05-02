@@ -31,7 +31,7 @@ export const registerSchema = z.object({
   full_name: z
     .string()
     .min(3)
-    .max(40)
+    .max(100)
     .regex(
       /^[a-zA-Z\u0600-\u06FF\s]+$/,
       "الاسم يجب أن يحتوي على حروف فقط وبدون أرقام",
