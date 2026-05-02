@@ -1,16 +1,24 @@
 import type { Request, Response } from "express";
 import { logoutService } from "./logout.service.js";
+import {
+  clearRefreshTokenCookie,
+  getRefreshTokenCookie,
+} from "../../common/utils/cookies.js";
+
 export const logoutController = async (req: Request, res: Response) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = getRefreshTokenCookie(req);
+
     if (!refreshToken) {
       return res.status(204).end();
     }
-    const result = await logoutService(refreshToken);
-    res.clearCookie("refreshToken");
 
-    return res.status(204);
+    await logoutService(refreshToken);
+    clearRefreshTokenCookie(res);
+
+    return res.status(204).end();
   } catch {
-    res.status(204);
+    clearRefreshTokenCookie(res);
+    return res.status(204).end();
   }
 };
