@@ -1,6 +1,10 @@
 import cors from "cors";
 import express from "express";
 import { authMiddleware } from "./common/middleware/auth.middleware.js";
+import {
+  invalidJsonBodyHandler,
+  jsonBodyMiddleware,
+} from "./common/middleware/jsonBody.middleware.js";
 import { openApiSpec } from "./docs/openapi.js";
 import { swaggerHtml } from "./docs/swaggerHtml.js";
 const app = express();
@@ -9,7 +13,7 @@ export default app;
 import authroutes from "./modules/auth/auth.routes.js";
 // import "./types/express.js";
 app.use(cors());
-app.use(express.json());
+app.use(...jsonBodyMiddleware);
 app.set("trust proxy", 1);
 app.get("/", (_req, res) => {
   res.json({
@@ -45,3 +49,7 @@ app.use((_req, res) => {
     message: "Route not found",
   });
 });
+
+app.use(invalidJsonBodyHandler);
+
+export default app;
