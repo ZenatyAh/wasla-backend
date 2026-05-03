@@ -18,22 +18,30 @@ export const sendResetEmail = async (to: string, token: string) => {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
   const resetLink = `${frontendUrl}/reset-password?token=${token}`;
   const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
     auth: {
       user,
       pass,
     },
   });
 
-  await transporter.sendMail({
-    from: `"Wasla" <${user}>`,
-    to,
-    subject: "Reset your password",
-    text: `Reset your password: ${resetLink}`,
-    html: `
+  try {
+    const info = await transporter.sendMail({
+      from: `"Wasla" <${user}>`,
+      to,
+      subject: "Reset your password",
+      text: `Reset your password: ${resetLink}`,
+      html: `
       <p>Click the link below to reset your password:</p>
       <a href="${resetLink}">Reset Password</a>
       <p>This link expires in 15 minutes.</p>
     `,
-  });
+    });
+
+    console.log("EMAIL SENT:", info);
+  } catch (err) {
+    console.error("EMAIL ERROR FULL:", err);
+  }
 };
