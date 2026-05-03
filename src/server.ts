@@ -8,6 +8,8 @@ import {
 import { openApiSpec } from "./docs/openapi.js";
 import { swaggerHtml } from "./docs/swaggerHtml.js";
 const app = express();
+export default app;
+
 import authroutes from "./modules/auth/auth.routes.js";
 // import "./types/express.js";
 app.use(cors());
