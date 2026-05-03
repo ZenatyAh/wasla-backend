@@ -44,6 +44,7 @@ model User {
   received_transactions Transaction[]        @relation("Receiver")
   sessions              session[]
   passwordResetTokens   PasswordResetToken[]
+  posts                 POST[]
 
   @@map("users") // لتسمية الجدول الفعلي في الداتابيز بحروف صغيرة
 }
@@ -67,7 +68,7 @@ model Skill {
 // تعريف نوع المهارة (Offer أم Need)
 enum SkillType {
   OFFER
-  NEED
+  Request
 }
 
 model UserSkill {
@@ -147,4 +148,41 @@ model PasswordResetToken {
 
   @@index([userId])
   @@index([tokenHash])
+}
+
+enum FulfillmentType {
+  Offline
+  Online
+}
+
+enum PostStatus {
+  AVAILABLE
+  ARCHIVED
+}
+
+enum locationList {
+  Gaza
+  Rfah
+  khanyounes
+}
+
+enum postType {
+  OFFER
+  REQUEST
+}
+
+model POST {
+  id          String          @id @default(cuid())
+  userId      Int
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        postType
+  title       String
+  description String
+  timeCredits Int
+  skill       String[]
+  ServiceMode FulfillmentType
+  status      PostStatus      @default(AVAILABLE)
+  location    locationList?
+  createdAt   DateTime        @default(now())
+  updated_at  DateTime        @updatedAt
 }
