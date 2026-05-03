@@ -1,17 +1,36 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const getEmailConfig = () => {
+  const user = process.env.EMAIL_USER?.trim();
+  const pass = process.env.EMAIL_PASSWORD?.trim();
+
+  if (!user || !pass) {
+    throw new Error(
+      "Missing EMAIL_USER or EMAIL_PASSWORD environment variable",
+    );
+  }
+
+  return { user, pass };
+};
 
 export const sendResetEmail = async (to: string, token: string) => {
+  const { user, pass } = getEmailConfig();
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
   const resetLink = `${frontendUrl}/reset-password?token=${token}`;
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user,
+      pass,
+    },
+  });
 
-  try {
-    const response = await resend.emails.send({
-      from: "Wasla <onboarding@resend.dev>", // غيّرها لاحقًا لدومينك
-      to,
-      subject: "Reset your password",
-      html: `
+  await transporter.sendMail({
+    from: `"Wasla" <${user}>`,
+    to,
+    subject: "Reset your password",
+    text: `Reset your password: ${resetLink}`,
+    html: `
       <div style="font-family: Arial, sans-serif; background-color:#f6f9fc; padding:40px 0;">
         <div style="max-width:520px; margin:0 auto; background:#ffffff; border-radius:12px; padding:30px; box-shadow:0 4px 20px rgba(0,0,0,0.05); text-align:center;">
           
@@ -39,11 +58,5 @@ export const sendResetEmail = async (to: string, token: string) => {
         </div>
       </div>
       `,
-    });
-
-    console.log("EMAIL SENT:", response);
-  } catch (err) {
-    console.error("EMAIL ERROR:", err);
-    throw err;
-  }
+  });
 };
