@@ -24,5 +24,10 @@ export const forgetPasswordService = async (email: string) => {
       tokenHash,
     },
   });
-  sendResetEmail(user.email, token).catch(console.error);
+  sendResetEmail(user.email, token).catch((err) => {
+    console.error("[forget-password] Failed to send reset email", {
+      email: user.email,
+      message: err instanceof Error ? err.message : err,
+    });
+  });
 };
