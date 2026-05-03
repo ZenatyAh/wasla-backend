@@ -22,7 +22,7 @@ router.post(
 router.post("/register", validate(registerSchema), RegisterControler);
 router.post(
   "/forget-password",
-  loginLimite(3, 10 * 60 * 1000),
+  loginLimite(3, 1000),
   forgetPasswordControllers,
 );
 router.post(
