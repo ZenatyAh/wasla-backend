@@ -51,5 +51,3 @@ app.use((_req, res) => {
 });
 
 app.use(invalidJsonBodyHandler);
-
-export default app;
