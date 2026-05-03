@@ -27,7 +27,7 @@ router.post(
 );
 router.post(
   "/reset-password",
-  loginLimite(5, 10 * 60 * 1000),
+  loginLimite(5, 1000),
   validate(resetPasswordSchema),
   resetPasswordController,
 );
