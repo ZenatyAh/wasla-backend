@@ -42,7 +42,7 @@ model User {
   // حركات تم إرسالها أو استلامها بواسطة هذا المستخدم
   sent_transactions     Transaction[]        @relation("Sender")
   received_transactions Transaction[]        @relation("Receiver")
-  sessions              session[]
+  sessions              Session[]
   passwordResetTokens   PasswordResetToken[]
   posts                 POST[]
 
@@ -57,7 +57,8 @@ model Skill {
   skill_name String @unique
 
   // العلاقات
-  users UserSkill[]
+  users      UserSkill[]
+  postSkills PostSkills[]
 
   @@map("skills")
 }
@@ -66,16 +67,16 @@ model Skill {
 // 3. User_Skills Table (الجدول الوسيط)
 // ----------------------------------------------------------------------
 // تعريف نوع المهارة (Offer أم Need)
-enum SkillType {
+enum ServiceType {
   OFFER
-  Request
+  REQUEST
 }
 
 model UserSkill {
-  id         Int       @id @default(autoincrement())
+  id         Int         @id @default(autoincrement())
   user_id    Int
   skill_id   Int
-  skill_type SkillType
+  skill_type ServiceType
 
   created_at DateTime @default(now())
 
@@ -120,7 +121,7 @@ model Transaction {
   @@map("transactions")
 }
 
-model session {
+model Session {
   id            String   @id
   refresh_token String   @unique
   user_id       Int
@@ -130,7 +131,9 @@ model session {
   expires_at    DateTime
   is_revoked    Boolean  @default(false)
   created_at    DateTime @default(now())
-  updated_at    DateTime
+  updated_at    DateTime @updatedAt
+
+  @@map("session")
 }
 
 model PasswordResetToken {
@@ -151,8 +154,8 @@ model PasswordResetToken {
 }
 
 enum FulfillmentType {
-  Offline
-  Online
+  OFFLINE
+  ONLINE
 }
 
 enum PostStatus {
@@ -160,29 +163,37 @@ enum PostStatus {
   ARCHIVED
 }
 
-enum locationList {
-  Gaza
-  Rfah
-  khanyounes
-}
-
-enum postType {
-  OFFER
-  REQUEST
-}
-
 model POST {
   id          String          @id @default(cuid())
   userId      Int
   user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        postType
+  type        ServiceType
   title       String
   description String
   timeCredits Int
-  skill       String[]
   ServiceMode FulfillmentType
   status      PostStatus      @default(AVAILABLE)
-  location    locationList?
+  location    String?
   createdAt   DateTime        @default(now())
   updated_at  DateTime        @updatedAt
+  skills      PostSkills[]
+  category    Category?       @relation(fields: [categoryId], references: [id])
+  categoryId  Int?
+}
+
+model PostSkills {
+  postId  String
+  skillId Int
+
+  post  POST  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([postId, skillId])
+}
+
+model Category {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  posts POST[]
 }
