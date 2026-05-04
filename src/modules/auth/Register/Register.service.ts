@@ -75,6 +75,7 @@ export const RegisterService = async (
       });
     }
 
+    // داخل حلقة requiredSkills
     for (const skillName of requiredSkills) {
       const skill = await tx.skill.upsert({
         where: { skill_name: skillName },
@@ -85,16 +86,17 @@ export const RegisterService = async (
       await tx.userSkill.upsert({
         where: {
           user_id_skill_id_skill_type: {
+            // تأكد من أن هذا الاسم يطابق ما يولده Prisma تماماً
             user_id: user.id,
             skill_id: skill.id,
-            skill_type: "NEED",
+            skill_type: "REQUEST", // تم التعديل هنا ليتوافق مع السكيما
           },
         },
         update: {},
         create: {
           user_id: user.id,
           skill_id: skill.id,
-          skill_type: "NEED",
+          skill_type: "REQUEST", // تم التعديل هنا ليتوافق مع السكيما
         },
       });
     }
