@@ -67,16 +67,16 @@ model Skill {
 // 3. User_Skills Table (الجدول الوسيط)
 // ----------------------------------------------------------------------
 // تعريف نوع المهارة (Offer أم Need)
-enum ServiceType {
+enum skill_type {
   OFFER
   REQUEST
 }
 
 model UserSkill {
-  id         Int         @id @default(autoincrement())
+  id         Int        @id @default(autoincrement())
   user_id    Int
   skill_id   Int
-  skill_type ServiceType
+  skill_type skill_type
 
   created_at DateTime @default(now())
 
@@ -167,7 +167,7 @@ model POST {
   id          String          @id @default(cuid())
   userId      Int
   user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        ServiceType
+  type        skill_type
   title       String
   description String
   timeCredits Int

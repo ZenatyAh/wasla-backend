@@ -1,3 +1,4 @@
+import { ServiceType } from './../../../generated/prisma/enums';
 import { prisma } from "../../../lib/prisma.js";
 import bcrypt from "bcrypt";
 import { createSession } from "./create_session.js";
@@ -87,7 +88,7 @@ export const RegisterService = async (
           user_id_skill_id_skill_type: {
             user_id: user.id,
             skill_id: skill.id,
-            skill_type: "NEED",
+            ServiceType:"REQUEST"
           },
         },
         update: {},
