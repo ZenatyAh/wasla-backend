@@ -1,0 +1,154 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                    Int                  @id @default(autoincrement())
+  full_name             String
+  username              String               @unique
+  email                 String               @unique
+  password_hash         String
+  bio                   String?
+  profile_image         String?
+  available_balance     Int                  @default(5)
+  escrow_balance        Int                  @default(0)
+  created_at            DateTime             @default(now())
+  updated_at            DateTime             @updatedAt
+  is_verified           Boolean              @default(false)
+  location              String?
+  passwordResetTokens   PasswordResetToken[]
+  posts                 Post[]
+  savedPosts            SavedPost[]
+  sessions              session[]
+  received_transactions Transaction[]        @relation("Receiver")
+  sent_transactions     Transaction[]        @relation("Sender")
+  skills                UserSkill[]
+
+  @@map("users")
+}
+
+model Skill {
+  id         Int         @id @default(autoincrement())
+  skill_name String      @unique
+  users      UserSkill[]
+
+  @@map("skills")
+}
+
+model UserSkill {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  skill_id   Int
+  skill_type SkillType
+  created_at DateTime  @default(now())
+  skill      Skill     @relation(fields: [skill_id], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, skill_id, skill_type])
+  @@map("user_skills")
+}
+
+model Post {
+  id                    Int         @id @default(autoincrement())
+  user_id               Int
+  title                 String
+  description           String
+  category              PostCategory
+  service_mode          ServiceMode
+  assigned_time_credits Int
+  status                PostStatus  @default(PUBLISHED)
+  created_at            DateTime    @default(now())
+  updated_at            DateTime    @updatedAt
+  user                  User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  savedBy               SavedPost[]
+
+  @@index([status])
+  @@index([user_id])
+  @@map("posts")
+}
+
+model SavedPost {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  post_id    Int
+  created_at DateTime @default(now())
+  post       Post     @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, post_id])
+  @@index([post_id])
+  @@map("saved_posts")
+}
+
+model Transaction {
+  id                    Int             @id @default(autoincrement())
+  receiver_id           Int
+  sender_id             Int?
+  amount                Int
+  transaction_type      TransactionType
+  reference_contract_id Int?
+  created_at            DateTime        @default(now())
+  receiver              User            @relation("Receiver", fields: [receiver_id], references: [id])
+  sender                User?           @relation("Sender", fields: [sender_id], references: [id])
+
+  @@map("transactions")
+}
+
+model session {
+  id            String   @id
+  refresh_token String   @unique
+  user_id       Int
+  device_info   String
+  ip_address    String?
+  expires_at    DateTime
+  is_revoked    Boolean  @default(false)
+  created_at    DateTime @default(now())
+  updated_at    DateTime
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    Int
+  tokenHash String    @db.VarChar(255)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+}
+
+enum SkillType {
+  OFFER
+  NEED
+}
+
+enum PostCategory {
+  OFFER
+  REQUEST
+}
+
+enum ServiceMode {
+  ONLINE
+  OFFLINE
+}
+
+enum PostStatus {
+  PUBLISHED
+  DRAFT
+  ARCHIVED
+}
+
+enum TransactionType {
+  TRANSFER
+  REFUND
+  WELCOME_BONUS
+}
