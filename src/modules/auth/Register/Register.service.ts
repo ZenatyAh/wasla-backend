@@ -87,14 +87,14 @@ export const RegisterService = async (
           user_id_skill_id_skill_type: {
             user_id: user.id,
             skill_id: skill.id,
-            skill_type: "NEED",
+            skill_type: "REQUEST",
           },
         },
         update: {},
         create: {
           user_id: user.id,
           skill_id: skill.id,
-          skill_type: "NEED",
+          skill_type: "REQUEST",
         },
       });
     }

@@ -25,7 +25,7 @@ model User {
   passwordResetTokens   PasswordResetToken[]
   posts                 Post[]
   savedPosts            SavedPost[]
-  sessions              session[]
+  sessions              Session[]
   received_transactions Transaction[]        @relation("Receiver")
   sent_transactions     Transaction[]        @relation("Sender")
   skills                UserSkill[]
@@ -45,7 +45,7 @@ model UserSkill {
   id         Int       @id @default(autoincrement())
   user_id    Int
   skill_id   Int
-  skill_type SkillType
+  skill_type skill_type
   created_at DateTime  @default(now())
   skill      Skill     @relation(fields: [skill_id], references: [id], onDelete: Cascade)
   user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -100,7 +100,7 @@ model Transaction {
   @@map("transactions")
 }
 
-model session {
+model Session {
   id            String   @id
   refresh_token String   @unique
   user_id       Int
@@ -109,8 +109,10 @@ model session {
   expires_at    DateTime
   is_revoked    Boolean  @default(false)
   created_at    DateTime @default(now())
-  updated_at    DateTime
+  updated_at    DateTime @updatedAt
   user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("session")
 }
 
 model PasswordResetToken {
@@ -126,9 +128,9 @@ model PasswordResetToken {
   @@index([tokenHash])
 }
 
-enum SkillType {
+enum skill_type {
   OFFER
-  NEED
+  REQUEST
 }
 
 enum PostCategory {
