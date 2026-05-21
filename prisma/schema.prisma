@@ -197,3 +197,22 @@ model Category {
 
   posts POST[]
 }
+
+// model Conversation {
+//   id              String @id @default(uuid())
+//   post_id
+//   user_recived_id
+//   user_send_id
+//   create_at
+//   contract_id
+//   last_message_at
+// }
+
+// model Message {
+//   id              String   @id @default(uuid())
+//   Conversation_id String
+//   sender_id       String
+//   recived_id      String
+//   message_text    String
+//   created_At      DateTime
+// }
