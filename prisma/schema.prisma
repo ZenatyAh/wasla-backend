@@ -1,122 +1,101 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
 generator client {
   provider     = "prisma-client"
   output       = "../src/generated/prisma"
   moduleFormat = "cjs"
 }
 
-// generator client {
-//   provider = "prisma-client"
-//   output   = "../src/generated/prisma"
-// }
-
 datasource db {
   provider = "postgresql"
 }
 
-// ----------------------------------------------------------------------
-// 1. Users Table
-// ----------------------------------------------------------------------
 model User {
-  id                Int     @id @default(autoincrement())
-  full_name         String
-  username          String  @unique
-  email             String  @unique
-  password_hash     String
-  bio               String? // ? يعني أن الحقل اختياري (Nullable)
-  profile_image     String?
-  location          String?
-  available_balance Int     @default(5)
-  escrow_balance    Int     @default(0)
-
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-  is_verified Boolean  @default(false)
-
-  // العلاقات (Relations) - كيف يرتبط المستخدم بالجداول الأخرى
-  skills UserSkill[]
-
-  // حركات تم إرسالها أو استلامها بواسطة هذا المستخدم
-  sent_transactions     Transaction[]        @relation("Sender")
-  received_transactions Transaction[]        @relation("Receiver")
-  sessions              Session[]
+  id                    Int                  @id @default(autoincrement())
+  full_name             String
+  username              String               @unique
+  email                 String               @unique
+  password_hash         String
+  bio                   String?
+  profile_image         String?
+  available_balance     Int                  @default(5)
+  escrow_balance        Int                  @default(0)
+  created_at            DateTime             @default(now())
+  updated_at            DateTime             @updatedAt
+  is_verified           Boolean              @default(false)
+  location              String?
   passwordResetTokens   PasswordResetToken[]
-  posts                 POST[]
+  posts                 Post[]
+  savedPosts            SavedPost[]
+  sessions              Session[]
+  received_transactions Transaction[]        @relation("Receiver")
+  sent_transactions     Transaction[]        @relation("Sender")
+  skills                UserSkill[]
 
-  @@map("users") // لتسمية الجدول الفعلي في الداتابيز بحروف صغيرة
+  @@map("users")
 }
 
-// ----------------------------------------------------------------------
-// 2. Skills Table (القائمة المرجعية للمهارات)
-// ----------------------------------------------------------------------
 model Skill {
-  id         Int    @id @default(autoincrement())
-  skill_name String @unique
-
-  // العلاقات
+  id         Int         @id @default(autoincrement())
+  skill_name String      @unique
   users      UserSkill[]
-  postSkills PostSkills[]
 
   @@map("skills")
 }
 
-// ----------------------------------------------------------------------
-// 3. User_Skills Table (الجدول الوسيط)
-// ----------------------------------------------------------------------
-// تعريف نوع المهارة (Offer أم Need)
-enum skill_type {
-  OFFER
-  REQUEST
-}
-
 model UserSkill {
-  id         Int        @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   user_id    Int
   skill_id   Int
   skill_type skill_type
+  created_at DateTime  @default(now())
+  skill      Skill     @relation(fields: [skill_id], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  created_at DateTime @default(now())
-
-  // ربط المفاتيح الأجنبية (Foreign Keys)
-  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  skill Skill @relation(fields: [skill_id], references: [id], onDelete: Cascade)
-
-  // لضمان عدم تكرار نفس المهارة لنفس المستخدم بنفس النوع (كعرض أو طلب)
   @@unique([user_id, skill_id, skill_type])
   @@map("user_skills")
 }
 
-// ----------------------------------------------------------------------
-// 4. Transactions Table (سجل الحركات)
-// ----------------------------------------------------------------------
-// تعريف أنواع الحركات الممكنة
-enum TransactionType {
-  TRANSFER
-  REFUND
-  WELCOME_BONUS
+model Post {
+  id                    Int         @id @default(autoincrement())
+  user_id               Int
+  title                 String
+  description           String
+  category              PostCategory
+  service_mode          ServiceMode
+  assigned_time_credits Int
+  status                PostStatus  @default(PUBLISHED)
+  created_at            DateTime    @default(now())
+  updated_at            DateTime    @updatedAt
+  user                  User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  savedBy               SavedPost[]
+
+  @@index([status])
+  @@index([user_id])
+  @@map("posts")
+}
+
+model SavedPost {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  post_id    Int
+  created_at DateTime @default(now())
+  post       Post     @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, post_id])
+  @@index([post_id])
+  @@map("saved_posts")
 }
 
 model Transaction {
-  id Int @id @default(autoincrement())
-
-  // المُستلِم (دائماً موجود)
-  receiver_id Int
-  receiver    User @relation("Receiver", fields: [receiver_id], references: [id])
-
-  // المُرسِل (قد يكون Null في حالة هدية التسجيل)
-  sender_id Int?
-  sender    User? @relation("Sender", fields: [sender_id], references: [id])
-
-  amount           Int
-  transaction_type TransactionType
-
-  // مرجعية العقد (ستضيف علاقة العقد لاحقاً، حالياً سنكتفي بالرقم)
-  reference_contract_id Int? // سنربطها بجدول Contract لاحقاً عندما ننشئه
-
-  created_at DateTime @default(now())
+  id                    Int             @id @default(autoincrement())
+  receiver_id           Int
+  sender_id             Int?
+  amount                Int
+  transaction_type      TransactionType
+  reference_contract_id Int?
+  created_at            DateTime        @default(now())
+  receiver              User            @relation("Receiver", fields: [receiver_id], references: [id])
+  sender                User?           @relation("Sender", fields: [sender_id], references: [id])
 
   @@map("transactions")
 }
@@ -125,75 +104,53 @@ model Session {
   id            String   @id
   refresh_token String   @unique
   user_id       Int
-  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   device_info   String
   ip_address    String?
   expires_at    DateTime
   is_revoked    Boolean  @default(false)
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("session")
 }
 
 model PasswordResetToken {
-  id String @id @default(cuid())
-
-  userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  tokenHash String   @db.VarChar(255)
+  id        String    @id @default(cuid())
+  userId    Int
+  tokenHash String    @db.VarChar(255)
   expiresAt DateTime
-
-  usedAt DateTime?
-
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tokenHash])
 }
 
-enum FulfillmentType {
-  OFFLINE
+enum skill_type {
+  OFFER
+  REQUEST
+}
+
+enum PostCategory {
+  OFFER
+  REQUEST
+}
+
+enum ServiceMode {
   ONLINE
+  OFFLINE
 }
 
 enum PostStatus {
-  AVAILABLE
+  PUBLISHED
+  DRAFT
   ARCHIVED
 }
 
-model POST {
-  id          String          @id @default(cuid())
-  userId      Int
-  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type        skill_type
-  title       String
-  description String
-  timeCredits Int
-  ServiceMode FulfillmentType
-  status      PostStatus      @default(AVAILABLE)
-  location    String?
-  createdAt   DateTime        @default(now())
-  updated_at  DateTime        @updatedAt
-  skills      PostSkills[]
-  category    Category?       @relation(fields: [categoryId], references: [id])
-  categoryId  Int?
-}
-
-model PostSkills {
-  postId  String
-  skillId Int
-
-  post  POST  @relation(fields: [postId], references: [id], onDelete: Cascade)
-  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
-
-  @@id([postId, skillId])
-}
-
-model Category {
-  id   Int    @id @default(autoincrement())
-  name String @unique
-
-  posts POST[]
+enum TransactionType {
+  TRANSFER
+  REFUND
+  WELCOME_BONUS
 }

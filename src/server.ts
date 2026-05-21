@@ -8,8 +8,10 @@ import {
 import { openApiSpec } from "./docs/openapi.js";
 import { swaggerHtml } from "./docs/swaggerHtml.js";
 const app = express();
+export default app;
 
 import authroutes from "./modules/auth/auth.routes.js";
+import postRoutes from "./modules/posts/posts.routes.js";
 // import "./types/express.js";
 app.use(cors());
 app.use(...jsonBodyMiddleware);
@@ -42,6 +44,7 @@ app.get("/me", authMiddleware, (req, res) => {
 });
 
 app.use("/auth", authroutes);
+app.use("/posts", postRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({
@@ -50,4 +53,3 @@ app.use((_req, res) => {
 });
 
 app.use(invalidJsonBodyHandler);
-export default app;

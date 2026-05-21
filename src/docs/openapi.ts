@@ -25,6 +25,10 @@ export const openApiSpec = {
       name: "User",
       description: "Authenticated user endpoints",
     },
+    {
+      name: "Posts",
+      description: "Post management operations (create, read, update, delete, save)",
+    },
   ],
   paths: {
     "/": {
@@ -366,6 +370,391 @@ export const openApiSpec = {
         },
       },
     },
+    "/posts": {
+      post: {
+        tags: ["Posts"],
+        summary: "Create a new post",
+        description: "Create a new post with title, description, category, and time credits. Requires authentication.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/CreatePostRequest",
+              },
+              example: {
+                title: "Need help with web development",
+                description: "I need someone to help me build a responsive React website. Looking for someone with 5+ years of experience in frontend development.",
+                category: "REQUEST",
+                serviceMode: "ONLINE",
+                assignedTimeCredits: 50,
+                status: "PUBLISHED",
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Post created successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/PostResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            $ref: "#/components/responses/BadRequest",
+          },
+          "401": {
+            $ref: "#/components/responses/Unauthorized",
+          },
+        },
+      },
+      get: {
+        tags: ["Posts"],
+        summary: "List all published posts",
+        description: "Retrieve all published posts from the system. No authentication required.",
+        responses: {
+          "200": {
+            description: "List of published posts",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    posts: {
+                      type: "array",
+                      items: {
+                        $ref: "#/components/schemas/Post",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            $ref: "#/components/responses/BadRequest",
+          },
+        },
+      },
+    },
+    "/posts/me": {
+      get: {
+        tags: ["Posts"],
+        summary: "List my posts",
+        description: "Retrieve all posts created by the authenticated user.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "List of user's posts",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    posts: {
+                      type: "array",
+                      items: {
+                        $ref: "#/components/schemas/Post",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "401": {
+            $ref: "#/components/responses/Unauthorized",
+          },
+          "400": {
+            $ref: "#/components/responses/BadRequest",
+          },
+        },
+      },
+    },
+    "/posts/saved": {
+      get: {
+        tags: ["Posts"],
+        summary: "List saved posts",
+        description: "Retrieve all posts saved by the authenticated user.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "List of saved posts",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    savedPosts: {
+                      type: "array",
+                      items: {
+                        $ref: "#/components/schemas/Post",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "401": {
+            $ref: "#/components/responses/Unauthorized",
+          },
+          "400": {
+            $ref: "#/components/responses/BadRequest",
+          },
+        },
+      },
+    },
+    "/posts/{postId}": {
+      get: {
+        tags: ["Posts"],
+        summary: "Get post by ID",
+        description: "Retrieve a specific post by its ID. Requires authentication.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "postId",
+            in: "path",
+            required: true,
+            schema: {
+              type: "integer",
+            },
+            example: 1,
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Post details",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    post: {
+                      $ref: "#/components/schemas/Post",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "401": {
+            $ref: "#/components/responses/Unauthorized",
+          },
+          "404": {
+            description: "Post not found",
+            content: {
+              "application/json": {
+                example: {
+                  status: "fail",
+                  message: "Post not found",
+                },
+              },
+            },
+          },
+        },
+      },
+      patch: {
+        tags: ["Posts"],
+        summary: "Update post",
+        description: "Update specific fields of a post. Only the post owner can update. At least one field is required.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "postId",
+            in: "path",
+            required: true,
+            schema: {
+              type: "integer",
+            },
+            example: 1,
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/UpdatePostRequest",
+              },
+              example: {
+                title: "Updated: Need help with web development",
+                assignedTimeCredits: 75,
+                status: "DRAFT",
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Post updated successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    post: {
+                      $ref: "#/components/schemas/Post",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            $ref: "#/components/responses/BadRequest",
+          },
+          "401": {
+            $ref: "#/components/responses/Unauthorized",
+          },
+          "404": {
+            description: "Post not found",
+            content: {
+              "application/json": {
+                example: {
+                  status: "fail",
+                  message: "Post not found",
+                },
+              },
+            },
+          },
+        },
+      },
+      delete: {
+        tags: ["Posts"],
+        summary: "Delete post",
+        description: "Delete a post. Only the post owner can delete their posts.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "postId",
+            in: "path",
+            required: true,
+            schema: {
+              type: "integer",
+            },
+            example: 1,
+          },
+        ],
+        responses: {
+          "204": {
+            description: "Post deleted successfully",
+          },
+          "401": {
+            $ref: "#/components/responses/Unauthorized",
+          },
+          "404": {
+            description: "Post not found",
+            content: {
+              "application/json": {
+                example: {
+                  status: "fail",
+                  message: "Post not found",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/posts/{postId}/save": {
+      post: {
+        tags: ["Posts"],
+        summary: "Save a post",
+        description: "Add a post to the authenticated user's saved posts.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "postId",
+            in: "path",
+            required: true,
+            schema: {
+              type: "integer",
+            },
+            example: 1,
+          },
+        ],
+        responses: {
+          "201": {
+            description: "Post saved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    savedPost: {
+                      $ref: "#/components/schemas/SavedPost",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Failed to save post",
+            content: {
+              "application/json": {
+                example: {
+                  status: "fail",
+                  message: "Save post failed",
+                },
+              },
+            },
+          },
+          "401": {
+            $ref: "#/components/responses/Unauthorized",
+          },
+        },
+      },
+      delete: {
+        tags: ["Posts"],
+        summary: "Unsave a post",
+        description: "Remove a post from the authenticated user's saved posts.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "postId",
+            in: "path",
+            required: true,
+            schema: {
+              type: "integer",
+            },
+            example: 1,
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Post unsaved successfully",
+            content: {
+              "application/json": {
+                example: {
+                  message: "Post unsaved successfully",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Failed to unsave post",
+            content: {
+              "application/json": {
+                example: {
+                  status: "fail",
+                  message: "Unsave post failed",
+                },
+              },
+            },
+          },
+          "401": {
+            $ref: "#/components/responses/Unauthorized",
+          },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -522,6 +911,149 @@ export const openApiSpec = {
           message: {
             type: "string",
             example: "Invalid request data",
+          },
+        },
+      },
+      CreatePostRequest: {
+        type: "object",
+        required: ["title", "description", "category", "serviceMode", "assignedTimeCredits"],
+        properties: {
+          title: {
+            type: "string",
+            minLength: 5,
+            maxLength: 200,
+            example: "Need help with web development",
+          },
+          description: {
+            type: "string",
+            minLength: 10,
+            maxLength: 5000,
+            example: "I need someone to help me build a responsive React website. Looking for someone with 5+ years of experience in frontend development.",
+          },
+          category: {
+            type: "string",
+            enum: ["OFFER", "REQUEST"],
+            example: "REQUEST",
+          },
+          serviceMode: {
+            type: "string",
+            enum: ["ONLINE", "OFFLINE"],
+            example: "ONLINE",
+          },
+          assignedTimeCredits: {
+            type: "integer",
+            minimum: 1,
+            maximum: 100000,
+            example: 50,
+          },
+          status: {
+            type: "string",
+            enum: ["PUBLISHED", "DRAFT", "ARCHIVED"],
+            example: "PUBLISHED",
+          },
+        },
+      },
+      UpdatePostRequest: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            minLength: 5,
+            maxLength: 200,
+          },
+          description: {
+            type: "string",
+            minLength: 10,
+            maxLength: 5000,
+          },
+          category: {
+            type: "string",
+            enum: ["OFFER", "REQUEST"],
+          },
+          serviceMode: {
+            type: "string",
+            enum: ["ONLINE", "OFFLINE"],
+          },
+          assignedTimeCredits: {
+            type: "integer",
+            minimum: 1,
+            maximum: 100000,
+          },
+          status: {
+            type: "string",
+            enum: ["PUBLISHED", "DRAFT", "ARCHIVED"],
+          },
+        },
+      },
+      Post: {
+        type: "object",
+        properties: {
+          id: {
+            type: "integer",
+            example: 1,
+          },
+          title: {
+            type: "string",
+            example: "Need help with web development",
+          },
+          description: {
+            type: "string",
+            example: "I need someone to help me build a responsive React website.",
+          },
+          category: {
+            type: "string",
+            enum: ["OFFER", "REQUEST"],
+            example: "REQUEST",
+          },
+          serviceMode: {
+            type: "string",
+            enum: ["ONLINE", "OFFLINE"],
+            example: "ONLINE",
+          },
+          assignedTimeCredits: {
+            type: "integer",
+            example: 50,
+          },
+          status: {
+            type: "string",
+            enum: ["PUBLISHED", "DRAFT", "ARCHIVED"],
+            example: "PUBLISHED",
+          },
+          userId: {
+            type: "integer",
+            example: 1,
+          },
+          createdAt: {
+            type: "string",
+            format: "date-time",
+            example: "2026-05-07T10:30:00Z",
+          },
+          updatedAt: {
+            type: "string",
+            format: "date-time",
+            example: "2026-05-07T10:30:00Z",
+          },
+        },
+      },
+      SavedPost: {
+        type: "object",
+        properties: {
+          id: {
+            type: "integer",
+            example: 1,
+          },
+          userId: {
+            type: "integer",
+            example: 1,
+          },
+          postId: {
+            type: "integer",
+            example: 1,
+          },
+          createdAt: {
+            type: "string",
+            format: "date-time",
+            example: "2026-05-07T10:30:00Z",
           },
         },
       },
