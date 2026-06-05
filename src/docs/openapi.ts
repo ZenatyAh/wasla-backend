@@ -67,6 +67,45 @@ export const openApiSpec = {
         },
       },
     },
+    "/docs": {
+      get: {
+        tags: ["System"],
+        summary: "Swagger UI",
+        description: "Serves the Swagger UI HTML page for browsing the API documentation.",
+        responses: {
+          "200": {
+            description: "Swagger UI HTML",
+            content: {
+              "text/html": {
+                schema: {
+                  type: "string",
+                },
+                example: "<!doctype html><html>...</html>",
+              },
+            },
+          },
+        },
+      },
+    },
+    "/docs/openapi.json": {
+      get: {
+        tags: ["System"],
+        summary: "OpenAPI JSON",
+        description: "Returns the OpenAPI specification used by the Swagger UI.",
+        responses: {
+          "200": {
+            description: "OpenAPI specification",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     "/me": {
       get: {
         tags: ["User"],
