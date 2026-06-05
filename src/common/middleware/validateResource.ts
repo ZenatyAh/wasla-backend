@@ -5,7 +5,7 @@ import { ZodObject, ZodError } from "zod";
 const validate =
   (schema: ZodObject) => (req: Request, res: Response, next: NextFunction) => {
     try {
-      schema.parse(req.body);
+      req.body = schema.parse(req.body);
 
       next(); // إذا نجح التحقق، انتقل للـ Controller
     } catch (e: any) {

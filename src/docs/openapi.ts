@@ -493,7 +493,7 @@ export const openApiSpec = {
                     savedPosts: {
                       type: "array",
                       items: {
-                        $ref: "#/components/schemas/Post",
+                        $ref: "#/components/schemas/SavedPost",
                       },
                     },
                   },
@@ -1033,6 +1033,28 @@ export const openApiSpec = {
             format: "date-time",
             example: "2026-05-07T10:30:00Z",
           },
+          user: {
+            type: "object",
+            properties: {
+              id: {
+                type: "integer",
+                example: 1,
+              },
+              username: {
+                type: "string",
+                example: "ahmed_zenaty_test",
+              },
+              full_name: {
+                type: "string",
+                example: "Ahmed Zenaty",
+              },
+              profile_image: {
+                type: "string",
+                nullable: true,
+                example: "https://example.com/avatar.png",
+              },
+            },
+          },
         },
       },
       SavedPost: {
@@ -1054,6 +1076,9 @@ export const openApiSpec = {
             type: "string",
             format: "date-time",
             example: "2026-05-07T10:30:00Z",
+          },
+          post: {
+            $ref: "#/components/schemas/Post",
           },
         },
       },

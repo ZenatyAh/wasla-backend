@@ -3,6 +3,7 @@ import type { CreatePostInput, UpdatePostInput } from "./posts.schema.js";
 
 const postSelect = {
     id: true,
+    user_id: true,
     title: true,
     description: true,
     category: true,
@@ -21,6 +22,64 @@ const postSelect = {
     },
 }
 
+type PostRecord = {
+    id: number
+    user_id: number
+    title: string
+    description: string
+    category: string
+    service_mode: string
+    assigned_time_credits: number
+    status: string
+    created_at: Date
+    updated_at: Date
+    user: {
+        id: number
+        username: string
+        full_name: string
+        profile_image: string | null
+    }
+}
+
+type SavedPostRecord = {
+    id: number
+    user_id: number
+    post_id: number
+    created_at: Date
+}
+
+const toPostResponse = (post: PostRecord) => ({
+    id: post.id,
+    userId: post.user_id,
+    title: post.title,
+    description: post.description,
+    category: post.category,
+    serviceMode: post.service_mode,
+    assignedTimeCredits: post.assigned_time_credits,
+    status: post.status,
+    createdAt: post.created_at,
+    updatedAt: post.updated_at,
+    user: post.user,
+})
+
+const toSavedPostResponse = (savedPost: SavedPostRecord) => ({
+    id: savedPost.id,
+    userId: savedPost.user_id,
+    postId: savedPost.post_id,
+    createdAt: savedPost.created_at,
+})
+
+const buildPostUpdateData = (data: UpdatePostInput) => ({
+    ...(data.title !== undefined ? { title: data.title } : {}),
+    ...(data.description !== undefined ? { description: data.description } : {}),
+    ...(data.category !== undefined ? { category: data.category } : {}),
+    ...(data.serviceMode !== undefined ? { service_mode: data.serviceMode } : {}),
+    ...(data.assignedTimeCredits !== undefined
+        ? { assigned_time_credits: data.assignedTimeCredits }
+        : {}),
+    ...(data.status !== undefined ? { status: data.status } : {}),
+})
+
 export const createPostService = async (data: CreatePostInput,userId: number) => {
     const post = await prisma.post.create({
     data: {
@@ -34,23 +93,25 @@ export const createPostService = async (data: CreatePostInput,userId: number) =>
     },
     select: postSelect,
     })
-    return post
+    return toPostResponse(post)
 }
 
 export const listPublishedPostsService = async () => {
-    return prisma.post.findMany({
+    const posts = await prisma.post.findMany({
         where: { status: "PUBLISHED" },
         orderBy: { created_at: "desc" },
         select: postSelect,
     })
+    return posts.map(toPostResponse)
 }
 
 export const listMyPostsService = async (userId: number) => {
-    return prisma.post.findMany({
+    const posts = await prisma.post.findMany({
         where: { user_id: userId },
         orderBy: { created_at: "desc" },
         select: postSelect,
     })
+    return posts.map(toPostResponse)
 }
 
 export const getPostByIdService = async (postId: number, userId: number) => {
@@ -61,11 +122,10 @@ export const getPostByIdService = async (postId: number, userId: number) => {
     if (!post) {
         throw new Error("Post not found")
     }
-    if (post.status !== "PUBLISHED") {
+    if (post.status !== "PUBLISHED" && post.user_id !== userId) {
         throw new Error("You cannot view this post")
     }
-    const { user_id: _userId, ...safePost } = post
-    return safePost
+    return toPostResponse(post)
 }
 
 export const updatePostService = async (postId: number,userId: number,data: UpdatePostInput) => {
@@ -82,16 +142,9 @@ export const updatePostService = async (postId: number,userId: number,data: Upda
 
     return prisma.post.update({
         where: { id: postId },
-        data: {
-            title: data.title,
-            description: data.description,
-            category: data.category,
-            service_mode: data.serviceMode,
-            assigned_time_credits: data.assignedTimeCredits,
-            status: data.status,
-        },
+        data: buildPostUpdateData(data),
         select: postSelect,
-    })
+    }).then(toPostResponse)
 }
 
 export const deletePostService = async (postId: number, userId: number) => {
@@ -121,7 +174,7 @@ export const savePostService = async (postId: number, userId: number) => {
         throw new Error("You cannot save this post")
     }
 
-    return prisma.savedPost.upsert({
+    const savedPost = await prisma.savedPost.upsert({
         where: {
             user_id_post_id: {
                 user_id: userId,
@@ -131,6 +184,7 @@ export const savePostService = async (postId: number, userId: number) => {
         update: {},
         create: { user_id: userId, post_id: postId },
     })
+    return toSavedPostResponse(savedPost)
 }
 
 export const unsavePostService = async (postId: number, userId: number) => {
@@ -155,18 +209,24 @@ export const unsavePostService = async (postId: number, userId: number) => {
 }
 
 export const listSavedPostsService = async (userId: number) => {
-    return prisma.savedPost.findMany({
+    const savedPosts = await prisma.savedPost.findMany({
         where: {
             user_id: userId,
-            post: { status: { in: ["PUBLISHED", "DRAFT"] } },
+            post: { status: "PUBLISHED" },
         },
         orderBy: { created_at: "desc" },
         select: {
             id: true,
+            user_id: true,
+            post_id: true,
             created_at: true,
             post: {
                 select: postSelect,
             }
         },
     })
+    return savedPosts.map((savedPost) => ({
+        ...toSavedPostResponse(savedPost),
+        post: toPostResponse(savedPost.post),
+    }))
 }

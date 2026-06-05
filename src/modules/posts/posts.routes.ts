@@ -15,10 +15,11 @@ import { createPostSchema, updatePostSchema } from "./posts.schema.js"
 
 const router = Router()
 
+router.get("/", listPublishedPostsController)
+
 router.use(authMiddleware)
 
 router.post("/", validate(createPostSchema), createPostController)
-router.get("/", listPublishedPostsController)
 router.get("/me", listMyPostsController);
 router.get("/saved", listSavedPostsController)
 router.get("/:postId", getPostByIdController)
