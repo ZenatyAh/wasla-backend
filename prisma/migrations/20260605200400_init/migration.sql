@@ -1,14 +1,20 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
-CREATE TYPE "ServiceType" AS ENUM ('OFFER', 'REQUEST');
+CREATE TYPE "skill_type" AS ENUM ('OFFER', 'REQUEST');
+
+-- CreateEnum
+CREATE TYPE "PostCategory" AS ENUM ('OFFER', 'REQUEST');
+
+-- CreateEnum
+CREATE TYPE "ServiceMode" AS ENUM ('ONLINE', 'OFFLINE');
+
+-- CreateEnum
+CREATE TYPE "PostStatus" AS ENUM ('PUBLISHED', 'DRAFT', 'ARCHIVED');
 
 -- CreateEnum
 CREATE TYPE "TransactionType" AS ENUM ('TRANSFER', 'REFUND', 'WELCOME_BONUS');
-
--- CreateEnum
-CREATE TYPE "FulfillmentType" AS ENUM ('OFFLINE', 'ONLINE');
-
--- CreateEnum
-CREATE TYPE "PostStatus" AS ENUM ('AVAILABLE', 'ARCHIVED');
 
 -- CreateTable
 CREATE TABLE "users" (
@@ -19,12 +25,12 @@ CREATE TABLE "users" (
     "password_hash" TEXT NOT NULL,
     "bio" TEXT,
     "profile_image" TEXT,
-    "location" TEXT,
     "available_balance" INTEGER NOT NULL DEFAULT 5,
     "escrow_balance" INTEGER NOT NULL DEFAULT 0,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
     "is_verified" BOOLEAN NOT NULL DEFAULT false,
+    "location" TEXT,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -42,10 +48,36 @@ CREATE TABLE "user_skills" (
     "id" SERIAL NOT NULL,
     "user_id" INTEGER NOT NULL,
     "skill_id" INTEGER NOT NULL,
-    "skill_type" "ServiceType" NOT NULL,
+    "skill_type" "skill_type" NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "user_skills_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "posts" (
+    "id" SERIAL NOT NULL,
+    "user_id" INTEGER NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "category" "PostCategory" NOT NULL,
+    "service_mode" "ServiceMode" NOT NULL,
+    "assigned_time_credits" INTEGER NOT NULL,
+    "status" "PostStatus" NOT NULL DEFAULT 'PUBLISHED',
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "posts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "saved_posts" (
+    "id" SERIAL NOT NULL,
+    "user_id" INTEGER NOT NULL,
+    "post_id" INTEGER NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "saved_posts_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -82,35 +114,10 @@ CREATE TABLE "PasswordResetToken" (
     "userId" INTEGER NOT NULL,
     "tokenHash" VARCHAR(255) NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
-    "usedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "usedAt" TIMESTAMP(3),
 
     CONSTRAINT "PasswordResetToken_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "POST" (
-    "id" TEXT NOT NULL,
-    "userId" INTEGER NOT NULL,
-    "type" "ServiceType" NOT NULL,
-    "title" TEXT NOT NULL,
-    "description" TEXT NOT NULL,
-    "timeCredits" INTEGER NOT NULL,
-    "ServiceMode" "FulfillmentType" NOT NULL,
-    "status" "PostStatus" NOT NULL DEFAULT 'AVAILABLE',
-    "location" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "POST_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "PostSkills" (
-    "postId" TEXT NOT NULL,
-    "skillId" INTEGER NOT NULL,
-
-    CONSTRAINT "PostSkills_pkey" PRIMARY KEY ("postId","skillId")
 );
 
 -- CreateIndex
@@ -126,6 +133,18 @@ CREATE UNIQUE INDEX "skills_skill_name_key" ON "skills"("skill_name");
 CREATE UNIQUE INDEX "user_skills_user_id_skill_id_skill_type_key" ON "user_skills"("user_id", "skill_id", "skill_type");
 
 -- CreateIndex
+CREATE INDEX "posts_status_idx" ON "posts"("status");
+
+-- CreateIndex
+CREATE INDEX "posts_user_id_idx" ON "posts"("user_id");
+
+-- CreateIndex
+CREATE INDEX "saved_posts_post_id_idx" ON "saved_posts"("post_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "saved_posts_user_id_post_id_key" ON "saved_posts"("user_id", "post_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "session_refresh_token_key" ON "session"("refresh_token");
 
 -- CreateIndex
@@ -135,10 +154,19 @@ CREATE INDEX "PasswordResetToken_userId_idx" ON "PasswordResetToken"("userId");
 CREATE INDEX "PasswordResetToken_tokenHash_idx" ON "PasswordResetToken"("tokenHash");
 
 -- AddForeignKey
+ALTER TABLE "user_skills" ADD CONSTRAINT "user_skills_skill_id_fkey" FOREIGN KEY ("skill_id") REFERENCES "skills"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "user_skills" ADD CONSTRAINT "user_skills_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_skills" ADD CONSTRAINT "user_skills_skill_id_fkey" FOREIGN KEY ("skill_id") REFERENCES "skills"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "posts" ADD CONSTRAINT "posts_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "saved_posts" ADD CONSTRAINT "saved_posts_post_id_fkey" FOREIGN KEY ("post_id") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "saved_posts" ADD CONSTRAINT "saved_posts_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "transactions" ADD CONSTRAINT "transactions_receiver_id_fkey" FOREIGN KEY ("receiver_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -151,12 +179,3 @@ ALTER TABLE "session" ADD CONSTRAINT "session_user_id_fkey" FOREIGN KEY ("user_i
 
 -- AddForeignKey
 ALTER TABLE "PasswordResetToken" ADD CONSTRAINT "PasswordResetToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "POST" ADD CONSTRAINT "POST_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "PostSkills" ADD CONSTRAINT "PostSkills_postId_fkey" FOREIGN KEY ("postId") REFERENCES "POST"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "PostSkills" ADD CONSTRAINT "PostSkills_skillId_fkey" FOREIGN KEY ("skillId") REFERENCES "skills"("id") ON DELETE CASCADE ON UPDATE CASCADE;
