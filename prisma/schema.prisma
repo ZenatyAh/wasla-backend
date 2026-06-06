@@ -29,7 +29,10 @@ model User {
   received_transactions Transaction[]        @relation("Receiver")
   sent_transactions     Transaction[]        @relation("Sender")
   skills                UserSkill[]
-
+  conversationsShare ConversationParticipant[]
+  conversation Conversation[]
+  sender Message[]
+  MessageRead MessageReadReceipt[]
   @@map("users")
 }
 
@@ -68,6 +71,7 @@ model Post {
   user                  User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
   savedBy               SavedPost[]
 
+  conversations Conversation[]
   @@index([status])
   @@index([user_id])
   @@map("posts")
@@ -155,21 +159,58 @@ enum TransactionType {
   WELCOME_BONUS
 }
 
-// model Conversation {
-//   id              String @id @default(uuid())
-//   post_id
-//   user_recived_id
-//   user_send_id
-//   create_at
-//   contract_id
-//   last_message_at
-// }
+model Conversation {
+  id        String @id @default(cuid())
+  postId    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-// model Message {
-//   id              String   @id @default(uuid())
-//   Conversation_id String
-//   sender_id       String
-//   recived_id      String
-//   message_text    String
-//   created_At      DateTime
-// }
+  post      Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  participants ConversationParticipant[]
+  messages     Message[]
+  @@map("conversations")
+  users User[]
+}
+
+model ConversationParticipant{
+  id String @id @default(cuid())
+  conversationId String 
+  userId Int
+  joinAt DateTime @default(now())
+
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id String @id @default(cuid())
+  senderId Int
+  conversationId String
+  body  String
+  createdAt DateTime @default(now())
+  editedAt DateTime?
+  DeletedAt DateTime?
+
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade) 
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  readReceipts MessageReadReceipt[]
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model MessageReadReceipt {
+  id String @id @default(cuid())
+  messageId String
+  userId Int
+  readAt DateTime @default(now())
+
+  sentMessage Message @relation(fields: [messageId], references: [id] , onDelete: Cascade)
+  user  User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@map("message_read_receipts")
+}

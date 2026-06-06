@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "tsx --test src/**/*.test.ts",
     "dev": "nodemon --watch src --ext ts --exec tsx src/index.ts",
     "build": "prisma generate && tsc",
     "start": "prisma migrate deploy && node dist/index.js",
@@ -41,7 +41,9 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.6.0",
     "@types/nodemailer": "^8.0.0",
+    "@types/supertest": "^7.2.0",
     "nodemon": "^3.1.14",
+    "supertest": "^7.2.2",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.2"
   }

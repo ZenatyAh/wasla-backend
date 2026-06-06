@@ -13,7 +13,28 @@ export default app;
 import authroutes from "./modules/auth/auth.routes.js";
 import postRoutes from "./modules/posts/posts.routes.js";
 // import "./types/express.js";
-app.use(cors());
+
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:5173",
+].filter((origin): origin is string => Boolean(origin));
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Allow non-browser clients (no Origin header) and allowlisted frontends.
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
+    credentials: true,
+  }),
+);
 app.use(...jsonBodyMiddleware);
 app.set("trust proxy", 1);
 app.get("/", (_req, res) => {
