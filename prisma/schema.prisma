@@ -16,6 +16,7 @@ model User {
   password_hash         String
   bio                   String?
   profile_image         String?
+  trust_rating          Float                @default(0)
   available_balance     Int                  @default(5)
   escrow_balance        Int                  @default(0)
   created_at            DateTime             @default(now())
@@ -62,6 +63,8 @@ model Post {
   category              PostCategory
   service_mode          ServiceMode
   assigned_time_credits Int
+  latitude              Float?
+  longitude             Float?
   status                PostStatus  @default(PUBLISHED)
   created_at            DateTime    @default(now())
   updated_at            DateTime    @updatedAt

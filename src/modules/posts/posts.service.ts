@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
-import type { CreatePostInput, UpdatePostInput } from "./posts.schema.js";
+import type { Prisma } from "../../generated/prisma/client.js";
+import type { CreatePostInput, SearchPostsQuery, UpdatePostInput } from "./posts.schema.js";
 
 const postSelect = {
     id: true,
@@ -17,6 +18,7 @@ const postSelect = {
             username: true,
             full_name: true,
             profile_image: true,
+            trust_rating: true,
         },
     },
 }
@@ -37,12 +39,64 @@ export const createPostService = async (data: CreatePostInput,userId: number) =>
     return post
 }
 
-export const listPublishedPostsService = async () => {
-    return prisma.post.findMany({
-        where: { status: "PUBLISHED" },
-        orderBy: { created_at: "desc" },
+const countOccurrences = (text: string, query: string) => {
+    if (!query) {
+        return 0
+    }
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const match = text.match(new RegExp(escaped, "gi"))
+    return match ? match.length : 0
+}
+
+const scorePostRelevance = (title: string, description: string, query: string) => {
+    const titleHits = countOccurrences(title, query)
+    const descriptionHits = countOccurrences(description, query)
+    return titleHits * 2 + descriptionHits
+}
+
+export const listPublishedPostsService = async (filters: SearchPostsQuery) => {
+    const where: Prisma.PostWhereInput = {
+        status: "PUBLISHED",
+        ...(filters.category ? { category: filters.category } : {}),
+        ...(filters.serviceMode ? { service_mode: filters.serviceMode } : {}),
+        ...(filters.minCredits || filters.maxCredits
+        ? {
+            assigned_time_credits: {
+                ...(filters.minCredits !== undefined ? { gte: filters.minCredits }: {}),
+                ...(filters.maxCredits !== undefined? { lte: filters.maxCredits }: {}),
+            },
+        } : {}),
+        ...(filters.minTrustRating !== undefined
+        ? { user: { is: { trust_rating: { gte: filters.minTrustRating } } } } : {}),
+        ...(filters.q
+        ? {
+            OR: [
+                { title: { contains: filters.q, mode: "insensitive" as const } },
+                { description: { contains: filters.q, mode: "insensitive" as const } },
+            ],}: {}),
+    }
+
+    const orderBy = filters.sort === "newest" || filters.sort === "nearest"
+        ? { created_at: "desc" as const }: undefined
+
+    const posts = await prisma.post.findMany({
+        where,
+        ...(orderBy ? { orderBy } : {}),
         select: postSelect,
     })
+
+    if (filters.sort === "relevance" && filters.q) {
+        return [...posts].sort((a, b) => {
+            const scoreA = scorePostRelevance(a.title, a.description, filters.q || "")
+            const scoreB = scorePostRelevance(b.title, b.description, filters.q || "")
+            if (scoreA === scoreB) {
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+            }
+            return scoreB - scoreA
+        })
+    }
+
+    return posts
 }
 
 export const listMyPostsService = async (userId: number) => {

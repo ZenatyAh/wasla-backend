@@ -417,6 +417,80 @@ export const openApiSpec = {
         tags: ["Posts"],
         summary: "List all published posts",
         description: "Retrieve all published posts from the system. No authentication required.",
+        parameters: [
+          {
+            name: "q",
+            in: "query",
+            required: false,
+            schema: {
+              type: "string",
+              minLength: 1,
+            },
+            description: "Search text in title or description",
+            example: "web development",
+          },
+          {
+            name: "category",
+            in: "query",
+            required: false,
+            schema: {
+              type: "string",
+              enum: ["OFFER", "REQUEST"],
+            },
+            description: "Filter by post type",
+          },
+          {
+            name: "serviceMode",
+            in: "query",
+            required: false,
+            schema: {
+              type: "string",
+              enum: ["ONLINE", "OFFLINE"],
+            },
+            description: "Filter by service mode",
+          },
+          {
+            name: "minCredits",
+            in: "query",
+            required: false,
+            schema: {
+              type: "integer",
+              minimum: 1,
+            },
+            description: "Minimum time credits",
+          },
+          {
+            name: "maxCredits",
+            in: "query",
+            required: false,
+            schema: {
+              type: "integer",
+              minimum: 1,
+            },
+            description: "Maximum time credits",
+          },
+          {
+            name: "minTrustRating",
+            in: "query",
+            required: false,
+            schema: {
+              type: "number",
+              minimum: 0,
+              maximum: 5,
+            },
+            description: "Minimum trust rating of the post owner",
+          },
+          {
+            name: "sort",
+            in: "query",
+            required: false,
+            schema: {
+              type: "string",
+              enum: ["relevance", "newest", "nearest"],
+            },
+            description: "Sort order for results",
+          },
+        ],
         responses: {
           "200": {
             description: "List of published posts",

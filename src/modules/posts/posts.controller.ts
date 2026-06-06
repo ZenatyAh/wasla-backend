@@ -1,7 +1,8 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import {createPostService,deletePostService,getPostByIdService,listMyPostsService,listPublishedPostsService,listSavedPostsService,savePostService,unsavePostService,updatePostService,} from "./posts.service.js";
-import type { CreatePostInput, UpdatePostInput } from "./posts.schema.js";
+import { searchPostsQuerySchema } from "./posts.schema.js";
+import type { CreatePostInput, SearchPostsQuery, UpdatePostInput } from "./posts.schema.js";
 import { getErrorMessage, sendError } from "../../common/utils/httpError.js";
 
 const postIdSchema = z.coerce.number().int().positive();
@@ -30,9 +31,10 @@ export const createPostController = async (req: Request, res: Response) => {
   }
 };
 
-export const listPublishedPostsController = async (_req: Request,res: Response) => {
+export const listPublishedPostsController = async (req: Request, res: Response) => {
   try {
-    const posts = await listPublishedPostsService()
+    const filters: SearchPostsQuery = searchPostsQuerySchema.parse(req.query)
+    const posts = await listPublishedPostsService(filters)
     return res.json({ posts })
   } catch (err: unknown) {
     return sendError(res, 400, getErrorMessage(err, "Fetch posts failed"))
