@@ -11,6 +11,10 @@ export const openApiSpec = {
       url: "http://localhost:3000",
       description: "Local development server",
     },
+    {
+      url: "https://wasla-backend.up.railway.app",
+      description: "Railway production server",
+    },
   ],
   tags: [
     {
