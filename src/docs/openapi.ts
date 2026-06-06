@@ -27,7 +27,11 @@ export const openApiSpec = {
     },
     {
       name: "User",
-      description: "Authenticated profile actions, wallets, and transaction histories",
+      description: "Authenticated profile actions, wallets, transaction histories, and public user profiles",
+    },
+    {
+      name: "Skills",
+      description: "Skill catalog used during registration and profile updates",
     },
     {
       name: "Posts",
@@ -40,6 +44,11 @@ export const openApiSpec = {
     {
       name: "Reviews",
       description: "Operations related to rating and reviewing users post service completion",
+    },
+    {
+      name: "Chat",
+      description:
+        "1:1 conversations linked to posts. REST endpoints handle persistence; live updates use Socket.IO (see /realtime/chat). Only conversation participants can read or send messages.",
     },
   ],
   paths: {
@@ -379,6 +388,84 @@ export const openApiSpec = {
         },
       },
     },
+    "/profile": {
+      get: {
+        tags: ["User"],
+        summary: "Get authenticated user's full profile",
+        description: "Returns the current user's profile including skills, balances, and verification status.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Profile retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    profile: { $ref: "#/components/schemas/UserProfileFull" },
+                  },
+                },
+                example: {
+                  profile: {
+                    id: 1,
+                    full_name: "Ahmed Zenaty",
+                    username: "ahmed_zenaty_test",
+                    email: "eng.ahmedzenaty@gmail.com",
+                    bio: "I am a test user for checking authentication and password reset flow.",
+                    profile_image: "https://example.com/avatar.png",
+                    location: "Ramallah",
+                    available_balance: 5,
+                    escrow_balance: 0,
+                    is_verified: false,
+                    offeredSkills: ["Design", "Writing"],
+                    requiredSkills: ["Coding", "Marketing"],
+                    created_at: "2026-01-15T10:00:00Z",
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+      patch: {
+        tags: ["User"],
+        summary: "Update authenticated user's profile",
+        description: "Update bio, profile image, location, and display name. Email and username cannot be changed here.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateProfileRequest" },
+              example: {
+                full_name: "Ahmed Zenaty",
+                bio: "Updated bio with at least fifty characters to pass validation rules in the backend.",
+                profile_image: "https://example.com/new-avatar.png",
+                location: "Nablus",
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Profile updated successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    profile: { $ref: "#/components/schemas/UserProfileFull" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
     "/profile/transactions": {
       get: {
         tags: ["User"],
@@ -401,11 +488,58 @@ export const openApiSpec = {
                     },
                   },
                 },
+                example: {
+                  transactions: [
+                    {
+                      id: 101,
+                      senderId: 1,
+                      receiverId: 2,
+                      amountOfHours: 3,
+                      transaction_type: "TRANSFER",
+                      reference_contract_id: null,
+                      createdAt: "2026-06-06T13:30:00Z",
+                    },
+                  ],
+                },
               },
             },
           },
           "401": {
             $ref: "#/components/responses/Unauthorized",
+          },
+        },
+      },
+    },
+    "/skills": {
+      get: {
+        tags: ["Skills"],
+        summary: "List available skills",
+        description: "Returns the skill catalog for autocomplete and profile editing.",
+        parameters: [
+          { name: "search", in: "query", required: false, schema: { type: "string" }, example: "design" },
+        ],
+        responses: {
+          "200": {
+            description: "Skill list retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    skills: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/Skill" },
+                    },
+                  },
+                },
+                example: {
+                  skills: [
+                    { id: 1, skill_name: "Design" },
+                    { id: 2, skill_name: "Coding" },
+                  ],
+                },
+              },
+            },
           },
         },
       },
@@ -437,6 +571,17 @@ export const openApiSpec = {
                     user: {
                       $ref: "#/components/schemas/UserProfile",
                     },
+                  },
+                },
+                example: {
+                  user: {
+                    id: 2,
+                    username: "saja_ai_test",
+                    full_name: "Saja",
+                    bio: "Software Engineering student specializing in AI.",
+                    profile_image: "https://example.com/avatar2.png",
+                    location: "Gaza",
+                    timeWalletBalance: 15,
                   },
                 },
               },
@@ -723,6 +868,10 @@ export const openApiSpec = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/CreateRequestInput" },
+              example: {
+                postId: 5,
+                hoursRequested: 3,
+              },
             },
           },
         },
@@ -730,9 +879,28 @@ export const openApiSpec = {
           "201": {
             description: "Request created successfully",
             content: {
-              "application/json": { schema: { $ref: "#/components/schemas/ServiceRequest" } },
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    request: { $ref: "#/components/schemas/ServiceRequest" },
+                  },
+                },
+                example: {
+                  request: {
+                    id: 501,
+                    postId: 5,
+                    requesterId: 1,
+                    postOwnerId: 2,
+                    hoursRequested: 3,
+                    status: "PENDING",
+                    createdAt: "2026-06-06T12:00:00Z",
+                  },
+                },
+              },
             },
           },
+          "400": { $ref: "#/components/responses/BadRequest" },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
@@ -752,10 +920,50 @@ export const openApiSpec = {
                     requests: { type: "array", items: { $ref: "#/components/schemas/ServiceRequest" } },
                   },
                 },
+                example: {
+                  requests: [
+                    {
+                      id: 501,
+                      postId: 5,
+                      requesterId: 1,
+                      postOwnerId: 2,
+                      hoursRequested: 3,
+                      status: "PENDING",
+                      createdAt: "2026-06-06T12:00:00Z",
+                    },
+                  ],
+                },
               },
             },
           },
           "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/requests/{id}": {
+      get: {
+        tags: ["Requests"],
+        summary: "Get service request by ID",
+        description: "Returns a single request if the authenticated user is the requester or the post owner.",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer" }, example: 501 }],
+        responses: {
+          "200": {
+            description: "Request retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    request: { $ref: "#/components/schemas/ServiceRequest" },
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Request not found" },
         },
       },
     },
@@ -771,6 +979,7 @@ export const openApiSpec = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/UpdateStatusInput" },
+              example: { status: "ACCEPTED" },
             },
           },
         },
@@ -778,10 +987,19 @@ export const openApiSpec = {
           "200": {
             description: "Request status updated successfully",
             content: {
-              "application/json": { schema: { $ref: "#/components/schemas/ServiceRequest" } },
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    request: { $ref: "#/components/schemas/ServiceRequest" },
+                  },
+                },
+              },
             },
           },
+          "400": { $ref: "#/components/responses/BadRequest" },
           "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
           "404": { description: "Request not found" },
         },
       },
@@ -796,6 +1014,11 @@ export const openApiSpec = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/CreateReviewInput" },
+              example: {
+                requestId: 501,
+                rating: 5,
+                comment: "ممتاز وأنصح بالتعامل معه.",
+              },
             },
           },
         },
@@ -803,7 +1026,14 @@ export const openApiSpec = {
           "201": {
             description: "Review created successfully",
             content: {
-              "application/json": { schema: { $ref: "#/components/schemas/Review" } },
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    review: { $ref: "#/components/schemas/Review" },
+                  },
+                },
+              },
             },
           },
           "400": { description: "Bad Request - Incomplete transaction or duplicate review" },
@@ -834,6 +1064,300 @@ export const openApiSpec = {
         },
       },
     },
+    "/conversations": {
+      post: {
+        tags: ["Chat"],
+        summary: "Start or reuse a 1:1 conversation about a post",
+        description:
+          "Creates a new conversation or returns an existing one for the same post and participant pair. Any authenticated user can message a post owner from the post page. If the caller is the post owner, `recipientId` is required.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateConversationRequest" },
+              example: { postId: 5 },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Conversation created",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationResponse" },
+              },
+            },
+          },
+          "200": {
+            description: "Existing conversation reused",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationResponse" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { description: "Post or recipient not found" },
+        },
+      },
+      get: {
+        tags: ["Chat"],
+        summary: "List conversations for the authenticated user",
+        description: "Returns conversations sorted by most recent activity, with last message preview and unread count.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "cursor", in: "query", required: false, schema: { type: "string" }, description: "Opaque cursor from previous page" },
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 20 } },
+        ],
+        responses: {
+          "200": {
+            description: "Paginated conversation list",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationListResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/conversations/{conversationId}": {
+      get: {
+        tags: ["Chat"],
+        summary: "Get conversation details",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "conversationId", in: "path", required: true, schema: { type: "string" }, example: "clx9f2k3m0000qz8h1a2b3c4d" },
+        ],
+        responses: {
+          "200": {
+            description: "Conversation details",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Conversation not found" },
+        },
+      },
+    },
+    "/conversations/{conversationId}/messages": {
+      get: {
+        tags: ["Chat"],
+        summary: "Get paginated message history",
+        description: "Returns messages in chronological order. Soft-deleted messages keep metadata but `body` is null.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "conversationId", in: "path", required: true, schema: { type: "string" }, example: "clx9f2k3m0000qz8h1a2b3c4d" },
+          { name: "cursor", in: "query", required: false, schema: { type: "string" }, description: "Message ID cursor for older messages" },
+          { name: "limit", in: "query", required: false, schema: { type: "integer", minimum: 1, maximum: 50, default: 30 } },
+        ],
+        responses: {
+          "200": {
+            description: "Paginated messages",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/MessageListResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Conversation not found" },
+        },
+      },
+      post: {
+        tags: ["Chat"],
+        summary: "Send a text message",
+        description: "Stores the message and emits a Socket.IO `chat:message:new` event to other participants.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "conversationId", in: "path", required: true, schema: { type: "string" }, example: "clx9f2k3m0000qz8h1a2b3c4d" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SendMessageRequest" },
+              example: { body: "مرحباً، هل الخدمة متاحة هذا الأسبوع؟" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Message sent",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: { $ref: "#/components/schemas/Message" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Conversation not found" },
+          "429": { $ref: "#/components/responses/TooManyRequests" },
+        },
+      },
+    },
+    "/messages/{messageId}": {
+      patch: {
+        tags: ["Chat"],
+        summary: "Edit own message",
+        description: "Only the original sender can edit. Deleted messages cannot be edited.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "messageId", in: "path", required: true, schema: { type: "string" }, example: "clx9f2k3m0001qz8h1a2b3c4d" },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/EditMessageRequest" },
+              example: { body: "مرحباً، هل يمكننا التنسيق يوم الخميس؟" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Message updated",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: { $ref: "#/components/schemas/Message" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Message not found" },
+        },
+      },
+      delete: {
+        tags: ["Chat"],
+        summary: "Soft-delete own message",
+        description: "Sets `deletedAt` and emits `chat:message:deleted`. Message history remains for participants.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "messageId", in: "path", required: true, schema: { type: "string" }, example: "clx9f2k3m0001qz8h1a2b3c4d" },
+        ],
+        responses: {
+          "200": {
+            description: "Message soft-deleted",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: { $ref: "#/components/schemas/Message" },
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Message not found" },
+        },
+      },
+    },
+    "/messages/{messageId}/read": {
+      post: {
+        tags: ["Chat"],
+        summary: "Mark a message as read",
+        description: "Creates a read receipt for the authenticated user. Emits `chat:message:read` to other participants.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "messageId", in: "path", required: true, schema: { type: "string" }, example: "clx9f2k3m0001qz8h1a2b3c4d" },
+        ],
+        responses: {
+          "200": {
+            description: "Read receipt recorded (idempotent if already read)",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    readReceipt: { $ref: "#/components/schemas/MessageReadReceipt" },
+                  },
+                },
+                example: {
+                  readReceipt: {
+                    id: "clx9f2k3m0002qz8h1a2b3c4d",
+                    messageId: "clx9f2k3m0001qz8h1a2b3c4d",
+                    userId: 2,
+                    readAt: "2026-06-06T14:05:00Z",
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Message not found" },
+        },
+      },
+    },
+    "/realtime/chat": {
+      get: {
+        tags: ["Chat"],
+        summary: "Socket.IO real-time events (documentation only)",
+        description: `This is **not** a REST endpoint. It documents the Socket.IO contract for live chat.
+
+**Connection**
+- URL: same host as API (e.g. \`http://localhost:3000\`)
+- Path: \`/socket.io\`
+- Auth: pass JWT access token on connect via \`auth: { token: "<accessToken>" }\`
+
+**Client → Server events**
+| Event | Payload | Purpose |
+|-------|---------|---------|
+| \`chat:join\` | \`{ conversationId: string }\` | Join a conversation room after opening a chat |
+| \`chat:leave\` | \`{ conversationId: string }\` | Leave a conversation room |
+
+**Server → Client events**
+| Event | Payload | Purpose |
+|-------|---------|---------|
+| \`chat:message:new\` | \`Message\` | New message in a joined conversation |
+| \`chat:message:edited\` | \`Message\` | Message body updated |
+| \`chat:message:deleted\` | \`{ id, conversationId, deletedAt }\` | Message soft-deleted |
+| \`chat:message:read\` | \`MessageReadReceipt\` | Another participant read a message |
+| \`chat:error\` | \`{ code, message }\` | Authorization or validation failure |
+
+**Notes**
+- REST remains the source of truth; Socket.IO is for live UI updates.
+- Reconnect and re-join rooms; fetch missed messages via \`GET /conversations/{id}/messages\`.
+- Sender ID always comes from the authenticated socket, never from client payload.`,
+        responses: {
+          "200": {
+            description: "Documentation reference only",
+            content: {
+              "application/json": {
+                example: {
+                  note: "Connect with Socket.IO client instead of calling this REST path.",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -856,6 +1380,13 @@ export const openApiSpec = {
           id: { type: "integer", example: 1 },
           email: { type: "string", format: "email", example: "eng.ahmedzenaty@gmail.com" },
           username: { type: "string", example: "ahmed_zenaty_test" },
+        },
+      },
+      Skill: {
+        type: "object",
+        properties: {
+          id: { type: "integer", example: 1 },
+          skill_name: { type: "string", example: "Design" },
         },
       },
       UserProfile: {
@@ -922,14 +1453,42 @@ export const openApiSpec = {
           message: { type: "string", example: "Invalid request data" },
         },
       },
+      UserProfileFull: {
+        type: "object",
+        properties: {
+          id: { type: "integer", example: 1 },
+          full_name: { type: "string", example: "Ahmed Zenaty" },
+          username: { type: "string", example: "ahmed_zenaty_test" },
+          email: { type: "string", format: "email", example: "eng.ahmedzenaty@gmail.com" },
+          bio: { type: "string", nullable: true, example: "I am a test user..." },
+          profile_image: { type: "string", format: "uri", nullable: true, example: "https://example.com/avatar.png" },
+          location: { type: "string", nullable: true, example: "Ramallah" },
+          available_balance: { type: "integer", example: 5 },
+          escrow_balance: { type: "integer", example: 0 },
+          is_verified: { type: "boolean", example: false },
+          offeredSkills: { type: "array", items: { type: "string" }, example: ["Design", "Writing"] },
+          requiredSkills: { type: "array", items: { type: "string" }, example: ["Coding", "Marketing"] },
+          created_at: { type: "string", format: "date-time" },
+        },
+      },
+      UpdateProfileRequest: {
+        type: "object",
+        properties: {
+          full_name: { type: "string", minLength: 3, maxLength: 40 },
+          bio: { type: "string", minLength: 50, maxLength: 200 },
+          profile_image: { type: "string", format: "uri" },
+          location: { type: "string" },
+        },
+      },
       Transaction: {
         type: "object",
         properties: {
           id: { type: "integer", example: 101 },
-          senderId: { type: "integer", example: 1 },
+          senderId: { type: "integer", nullable: true, example: 1 },
           receiverId: { type: "integer", example: 2 },
           amountOfHours: { type: "integer", example: 3 },
-          postId: { type: "integer", example: 5 },
+          transaction_type: { type: "string", enum: ["TRANSFER", "REFUND", "WELCOME_BONUS"], example: "TRANSFER" },
+          reference_contract_id: { type: "integer", nullable: true, example: null },
           createdAt: { type: "string", format: "date-time", example: "2026-06-06T13:30:00Z" },
         },
       },
@@ -988,6 +1547,7 @@ export const openApiSpec = {
           id: { type: "integer", example: 501 },
           postId: { type: "integer", example: 5 },
           requesterId: { type: "integer", example: 1 },
+          postOwnerId: { type: "integer", example: 2 },
           hoursRequested: { type: "integer", example: 3 },
           status: { type: "string", enum: ["PENDING", "ACCEPTED", "REJECTED", "COMPLETED", "CANCELED"], example: "PENDING" },
           createdAt: { type: "string", format: "date-time", example: "2026-06-06T12:00:00Z" },
@@ -1029,6 +1589,132 @@ export const openApiSpec = {
           comment: { type: "string", example: "ممتاز وأنصح بالتعامل معه." },
         },
       },
+      ConversationParticipant: {
+        type: "object",
+        properties: {
+          userId: { type: "integer", example: 2 },
+          user: { $ref: "#/components/schemas/UserProfile" },
+          joinedAt: { type: "string", format: "date-time", example: "2026-06-06T13:00:00Z" },
+        },
+      },
+      Conversation: {
+        type: "object",
+        properties: {
+          id: { type: "string", example: "clx9f2k3m0000qz8h1a2b3c4d" },
+          postId: { type: "integer", example: 5 },
+          post: { $ref: "#/components/schemas/Post" },
+          participants: {
+            type: "array",
+            items: { $ref: "#/components/schemas/ConversationParticipant" },
+          },
+          lastMessage: { $ref: "#/components/schemas/Message" },
+          unreadCount: { type: "integer", example: 2, description: "Unread messages for the authenticated user" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      ConversationResponse: {
+        type: "object",
+        properties: {
+          conversation: { $ref: "#/components/schemas/Conversation" },
+        },
+        example: {
+          conversation: {
+            id: "clx9f2k3m0000qz8h1a2b3c4d",
+            postId: 5,
+            participants: [
+              { userId: 1, user: { id: 1, username: "ahmed_zenaty_test", full_name: "Ahmed Zenaty" } },
+              { userId: 2, user: { id: 2, username: "saja_ai_test", full_name: "Saja" } },
+            ],
+            unreadCount: 0,
+            createdAt: "2026-06-06T13:00:00Z",
+            updatedAt: "2026-06-06T14:00:00Z",
+          },
+        },
+      },
+      ConversationListResponse: {
+        type: "object",
+        properties: {
+          conversations: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Conversation" },
+          },
+          nextCursor: { type: "string", nullable: true, example: "clx9f2k3m0000qz8h1a2b3c4d" },
+        },
+      },
+      Message: {
+        type: "object",
+        properties: {
+          id: { type: "string", example: "clx9f2k3m0001qz8h1a2b3c4d" },
+          conversationId: { type: "string", example: "clx9f2k3m0000qz8h1a2b3c4d" },
+          senderId: { type: "integer", example: 1 },
+          sender: { $ref: "#/components/schemas/User" },
+          body: { type: "string", nullable: true, example: "مرحباً، هل الخدمة متاحة هذا الأسبوع؟" },
+          createdAt: { type: "string", format: "date-time", example: "2026-06-06T14:00:00Z" },
+          editedAt: { type: "string", format: "date-time", nullable: true, example: null },
+          deletedAt: { type: "string", format: "date-time", nullable: true, example: null },
+          readBy: {
+            type: "array",
+            description: "Read receipts from other participants",
+            items: { $ref: "#/components/schemas/MessageReadReceipt" },
+          },
+        },
+      },
+      MessageListResponse: {
+        type: "object",
+        properties: {
+          messages: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Message" },
+          },
+          nextCursor: { type: "string", nullable: true, example: "clx9f2k3m0001qz8h1a2b3c4d" },
+        },
+      },
+      MessageReadReceipt: {
+        type: "object",
+        properties: {
+          id: { type: "string", example: "clx9f2k3m0002qz8h1a2b3c4d" },
+          messageId: { type: "string", example: "clx9f2k3m0001qz8h1a2b3c4d" },
+          userId: { type: "integer", example: 2 },
+          readAt: { type: "string", format: "date-time", example: "2026-06-06T14:05:00Z" },
+        },
+      },
+      CreateConversationRequest: {
+        type: "object",
+        required: ["postId"],
+        properties: {
+          postId: { type: "integer", example: 5, description: "Post that started the conversation" },
+          recipientId: {
+            type: "integer",
+            example: 1,
+            description: "Required when the caller is the post owner; omitted when messaging the post owner",
+          },
+        },
+      },
+      SendMessageRequest: {
+        type: "object",
+        required: ["body"],
+        properties: {
+          body: {
+            type: "string",
+            minLength: 1,
+            maxLength: 2000,
+            example: "مرحباً، هل الخدمة متاحة هذا الأسبوع؟",
+          },
+        },
+      },
+      EditMessageRequest: {
+        type: "object",
+        required: ["body"],
+        properties: {
+          body: {
+            type: "string",
+            minLength: 1,
+            maxLength: 2000,
+            example: "مرحباً، هل يمكننا التنسيق يوم الخميس؟",
+          },
+        },
+      },
     },
     responses: {
       BadRequest: {
@@ -1046,6 +1732,17 @@ export const openApiSpec = {
       TooManyRequests: {
         description: "Rate limit exceeded",
         content: { "application/json": { example: "Too many attempts. Please try again later." } },
+      },
+      Forbidden: {
+        description: "Authenticated but not allowed to access this resource",
+        content: {
+          "application/json": {
+            example: {
+              status: "fail",
+              message: "You do not have access to this resource",
+            },
+          },
+        },
       },
     },
   },
