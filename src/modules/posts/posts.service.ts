@@ -1,4 +1,8 @@
 import { prisma } from "../../lib/prisma.js";
+import {
+    syncInteraction,
+    syncPost,
+} from "../recommender/recommender.client.js";
 import type { CreatePostInput, UpdatePostInput } from "./posts.schema.js";
 
 const postSelect = {
@@ -93,6 +97,7 @@ export const createPostService = async (data: CreatePostInput,userId: number) =>
     },
     select: postSelect,
     })
+    syncPost(post.id)
     return toPostResponse(post)
 }
 
@@ -144,7 +149,10 @@ export const updatePostService = async (postId: number,userId: number,data: Upda
         where: { id: postId },
         data: buildPostUpdateData(data),
         select: postSelect,
-    }).then(toPostResponse)
+    }).then((updated) => {
+        syncPost(updated.id)
+        return toPostResponse(updated)
+    })
 }
 
 export const deletePostService = async (postId: number, userId: number) => {
@@ -184,6 +192,7 @@ export const savePostService = async (postId: number, userId: number) => {
         update: {},
         create: { user_id: userId, post_id: postId },
     })
+    syncInteraction({ userId, postId, action: "save" })
     return toSavedPostResponse(savedPost)
 }
 

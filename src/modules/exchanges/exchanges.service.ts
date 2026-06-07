@@ -1,4 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
+import { syncInteraction } from "../recommender/recommender.client.js";
 import { ExchangeError } from "./exchanges.errors.js";
 import type { CreateExchangeInput, ListExchangesQuery } from "./exchanges.schema.js";
 
@@ -171,6 +172,12 @@ export const requestExchange = async (
       escrow_status: "NONE",
     },
     select: exchangeSelect,
+  });
+
+  syncInteraction({
+    userId: requesterId,
+    postId: data.postId,
+    action: "apply",
   });
 
   return toExchangeResponse(exchange as ExchangeRecord);
