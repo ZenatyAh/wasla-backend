@@ -4,7 +4,7 @@ export const openApiSpec = {
     title: "Wasla Backend API",
     version: "1.0.0",
     description:
-      "API documentation for Wasla backend auth, profile, and health endpoints.",
+      "API documentation for Wasla backend including auth, posts, chat, notifications, and real-time messaging.",
   },
   servers: [
     {
@@ -28,6 +28,14 @@ export const openApiSpec = {
     {
       name: "Posts",
       description: "Post management operations (create, read, update, delete, save)",
+    },
+    {
+      name: "Chat",
+      description: "1:1 post-linked conversations, messages, and Socket.IO events",
+    },
+    {
+      name: "Notifications",
+      description: "In-app notifications for chat and platform events",
     },
   ],
   paths: {
@@ -794,6 +802,183 @@ export const openApiSpec = {
         },
       },
     },
+    "/conversations": {
+      post: {
+        tags: ["Chat"],
+        summary: "Start or reuse a conversation",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateConversationRequest" },
+              example: { postId: 1 },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "Conversation created" },
+          "200": { description: "Existing conversation reused" },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { description: "Post or recipient not found" },
+        },
+      },
+      get: {
+        tags: ["Chat"],
+        summary: "List conversations for current user",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 20 } },
+        ],
+        responses: {
+          "200": { description: "Paginated conversations" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/conversations/{conversationId}": {
+      get: {
+        tags: ["Chat"],
+        summary: "Get conversation details",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "conversationId", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          "200": { description: "Conversation details" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Conversation not found" },
+        },
+      },
+    },
+    "/conversations/{conversationId}/messages": {
+      get: {
+        tags: ["Chat"],
+        summary: "List messages",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "conversationId", in: "path", required: true, schema: { type: "string" } },
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 30 } },
+        ],
+        responses: {
+          "200": { description: "Paginated messages" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+      post: {
+        tags: ["Chat"],
+        summary: "Send a message",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "conversationId", in: "path", required: true, schema: { type: "string" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SendMessageRequest" },
+              example: { body: "مرحباً، هل الخدمة متاحة؟" },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "Message sent" },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "429": { $ref: "#/components/responses/TooManyRequests" },
+        },
+      },
+    },
+    "/messages/{messageId}": {
+      patch: {
+        tags: ["Chat"],
+        summary: "Edit own message",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "messageId", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/EditMessageRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Message updated" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+      delete: {
+        tags: ["Chat"],
+        summary: "Soft-delete own message",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "messageId", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: "Message soft-deleted" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+    "/messages/{messageId}/read": {
+      post: {
+        tags: ["Chat"],
+        summary: "Mark message as read",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "messageId", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: "Read receipt recorded" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+    "/notifications": {
+      get: {
+        tags: ["Notifications"],
+        summary: "List notifications",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": { description: "Notification list" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/notifications/read-all": {
+      patch: {
+        tags: ["Notifications"],
+        summary: "Mark all notifications as read",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": { description: "All notifications marked as read" },
+        },
+      },
+    },
+    "/notifications/{id}/read": {
+      patch: {
+        tags: ["Notifications"],
+        summary: "Mark one notification as read",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: "Notification marked as read" },
+          "404": { description: "Notification not found" },
+        },
+      },
+    },
+    "/realtime/chat": {
+      get: {
+        tags: ["Chat"],
+        summary: "Socket.IO events reference (documentation only)",
+        description:
+          "Connect via Socket.IO using JWT in auth.token. Client events: chat:join, chat:leave. Server events: chat:message:new, chat:message:edited, chat:message:deleted, chat:message:read, chat:notification:new, chat:error.",
+        responses: {
+          "200": { description: "Documentation reference only" },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -1121,6 +1306,62 @@ export const openApiSpec = {
           },
         },
       },
+      CreateConversationRequest: {
+        type: "object",
+        required: ["postId"],
+        properties: {
+          postId: { type: "integer", example: 1 },
+          recipientId: { type: "integer", example: 2 },
+        },
+      },
+      SendMessageRequest: {
+        type: "object",
+        required: ["body"],
+        properties: {
+          body: { type: "string", minLength: 1, maxLength: 2000 },
+        },
+      },
+      EditMessageRequest: {
+        type: "object",
+        required: ["body"],
+        properties: {
+          body: { type: "string", minLength: 1, maxLength: 2000 },
+        },
+      },
+      Message: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          conversationId: { type: "string" },
+          senderId: { type: "integer" },
+          body: { type: "string", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          editedAt: { type: "string", format: "date-time", nullable: true },
+          deletedAt: { type: "string", format: "date-time", nullable: true },
+        },
+      },
+      Conversation: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          postId: { type: "integer" },
+          unreadCount: { type: "integer" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      Notification: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          userId: { type: "integer" },
+          type: { type: "string", enum: ["NEW_MESSAGE", "CONVERSATION_STARTED"] },
+          title: { type: "string" },
+          body: { type: "string" },
+          isRead: { type: "boolean" },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
     },
     responses: {
       BadRequest: {
@@ -1167,6 +1408,17 @@ export const openApiSpec = {
         content: {
           "application/json": {
             example: "Too many login attempts. Please try again after 1 minute.",
+          },
+        },
+      },
+      Forbidden: {
+        description: "Authenticated but not allowed to access this resource",
+        content: {
+          "application/json": {
+            example: {
+              status: "fail",
+              message: "You do not have access to this resource",
+            },
           },
         },
       },
