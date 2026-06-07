@@ -1,9 +1,10 @@
+import type { RequestListener } from "http";
 import type { Server } from "http";
 import { createServer } from "http";
 import type { AddressInfo } from "node:net";
 
 export const startSocketTestServer = async (
-  app: Parameters<typeof createServer>[0],
+  app: RequestListener,
   initSocket: (server: Server) => unknown,
 ) => {
   const server = createServer(app);
