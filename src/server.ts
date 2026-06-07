@@ -16,6 +16,10 @@ import exchangeRoutes from "./modules/exchanges/exchanges.routes.js";
 import messageRoutes from "./modules/chat/message.routes.js";
 import notificationRoutes from "./modules/notifications/notification.routes.js";
 import postRoutes from "./modules/posts/posts.routes.js";
+import {
+  feedRouter,
+  internalRecommenderRouter,
+} from "./modules/recommender/recommender.routes.js";
 import reviewRoutes from "./modules/reviews/review.routes.js";
 import userRoutes from "./modules/users/users.routes.js";
 // import "./types/express.js";
@@ -83,6 +87,8 @@ app.use("/messages", messageRoutes);
 app.use("/notifications", notificationRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/feed", feedRouter);
+app.use("/internal", internalRecommenderRouter);
 
 app.use((_req, res) => {
   res.status(404).json({

@@ -23,3 +23,20 @@ if (!explicitTokenSecret) {
 
 /** Used for password-reset token hashing; falls back to JWT_SECRET if unset. */
 export const TOKEN_SECRET = explicitTokenSecret || JWT_SECRET;
+
+/**
+ * Recommender (FastAPI) integration. All optional: when RECOMMENDER_URL or
+ * RECOMMENDER_API_KEY is unset the integration is treated as disabled — sync
+ * pushes become no-ops, the feed proxy falls back to chronological, and the
+ * export endpoint refuses every request (no shared secret configured).
+ */
+export const RECOMMENDER_URL = process.env.RECOMMENDER_URL?.trim() || "";
+export const RECOMMENDER_API_KEY = process.env.RECOMMENDER_API_KEY?.trim() || "";
+export const RECOMMENDER_TIMEOUT_MS = Number(
+  process.env.RECOMMENDER_TIMEOUT_MS || 5000,
+);
+
+/** True when this service can push to / pull from the recommender. */
+export const RECOMMENDER_ENABLED = Boolean(
+  RECOMMENDER_URL && RECOMMENDER_API_KEY,
+);
