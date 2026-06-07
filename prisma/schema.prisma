@@ -18,6 +18,8 @@ model User {
   profile_image         String?
   available_balance     Int                  @default(5)
   escrow_balance        Int                  @default(0)
+  services_provided     Int                  @default(0)
+  services_received     Int                  @default(0)
   created_at            DateTime             @default(now())
   updated_at            DateTime             @updatedAt
   is_verified           Boolean              @default(false)
@@ -171,9 +173,20 @@ enum NotificationType {
 
 enum ServiceExchangeStatus {
   PENDING
-  ACTIVE
+  ACCEPTED
+  IN_PROGRESS
+  WAITING_CONFIRMATION
   COMPLETED
-  CANCELLED
+  CANCELED
+  REJECTED
+  DISPUTED
+}
+
+enum EscrowStatus {
+  NONE
+  HELD
+  RELEASED
+  REFUNDED
 }
 
 model Conversation {
@@ -249,15 +262,19 @@ model Notification {
 }
 
 model ServiceExchange {
-  id           Int                   @id @default(autoincrement())
-  post_id      Int?
-  provider_id  Int
-  consumer_id  Int
-  time_credits Int
-  status       ServiceExchangeStatus @default(PENDING)
-  completed_at DateTime?
-  created_at   DateTime              @default(now())
-  updated_at   DateTime              @updatedAt
+  id            Int                   @id @default(autoincrement())
+  post_id       Int?
+  provider_id   Int
+  consumer_id   Int
+  time_credits  Int
+  status        ServiceExchangeStatus @default(PENDING)
+  escrow_status EscrowStatus          @default(NONE)
+  accepted_at   DateTime?
+  delivered_at  DateTime?
+  completed_at  DateTime?
+  canceled_at   DateTime?
+  created_at    DateTime              @default(now())
+  updated_at    DateTime              @updatedAt
 
   post     Post?    @relation(fields: [post_id], references: [id], onDelete: SetNull)
   provider User     @relation("ProvidedExchanges", fields: [provider_id], references: [id])
