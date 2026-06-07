@@ -37,6 +37,14 @@ export const openApiSpec = {
       name: "Notifications",
       description: "In-app notifications for chat and platform events",
     },
+    {
+      name: "Profile",
+      description: "User profile read and update endpoints",
+    },
+    {
+      name: "Reviews",
+      description: "Service exchange reviews and ratings",
+    },
   ],
   paths: {
     "/": {
@@ -968,6 +976,123 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/users/profile": {
+      put: {
+        tags: ["Profile"],
+        summary: "Update current user profile",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateProfileRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Updated profile",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/BasicProfileResponse" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/api/users/{id}/profile": {
+      get: {
+        tags: ["Profile"],
+        summary: "Get user profile with stats and recent exchanges",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "User profile",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/FullProfileResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { description: "User not found" },
+        },
+      },
+    },
+    "/api/users/{id}/reviews": {
+      get: {
+        tags: ["Reviews"],
+        summary: "List reviews received by a user",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+          },
+          { name: "cursor", in: "query", schema: { type: "integer" } },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", default: 20, maximum: 50 },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Paginated review list",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ReviewListResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { description: "User not found" },
+        },
+      },
+    },
+    "/api/reviews": {
+      post: {
+        tags: ["Reviews"],
+        summary: "Submit a review for a completed service exchange",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateReviewRequest" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Review created",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ReviewResponse" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Service exchange not found" },
+          "409": { description: "Duplicate review" },
+        },
+      },
+    },
     "/realtime/chat": {
       get: {
         tags: ["Chat"],
@@ -1360,6 +1485,123 @@ export const openApiSpec = {
           body: { type: "string" },
           isRead: { type: "boolean" },
           createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      UpdateProfileRequest: {
+        type: "object",
+        properties: {
+          name: { type: "string", minLength: 3, maxLength: 100 },
+          bio: { type: "string", maxLength: 500, nullable: true },
+          profilePicture: { type: "string", format: "uri", nullable: true },
+        },
+      },
+      BasicProfileResponse: {
+        type: "object",
+        properties: {
+          profile: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              username: { type: "string" },
+              bio: { type: "string", nullable: true },
+              profilePicture: { type: "string", nullable: true },
+            },
+          },
+        },
+      },
+      FullProfileResponse: {
+        type: "object",
+        properties: {
+          profile: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              username: { type: "string" },
+              bio: { type: "string", nullable: true },
+              profilePicture: { type: "string", nullable: true },
+              stats: {
+                type: "object",
+                properties: {
+                  availableTimeCredits: { type: "integer" },
+                  servicesProvided: { type: "integer" },
+                  servicesReceived: { type: "integer" },
+                },
+              },
+              trustRating: {
+                type: "object",
+                properties: {
+                  average: { type: "number", nullable: true },
+                  count: { type: "integer" },
+                },
+              },
+              recentExchanges: {
+                type: "array",
+                items: { $ref: "#/components/schemas/RecentExchange" },
+              },
+            },
+          },
+        },
+      },
+      RecentExchange: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          role: { type: "string", enum: ["PROVIDER", "CONSUMER"] },
+          timeCredits: { type: "integer" },
+          completedAt: { type: "string", format: "date-time", nullable: true },
+          post: {
+            type: "object",
+            nullable: true,
+            properties: {
+              id: { type: "integer" },
+              title: { type: "string" },
+            },
+          },
+          counterparty: { $ref: "#/components/schemas/UserSummary" },
+        },
+      },
+      UserSummary: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          username: { type: "string" },
+          name: { type: "string" },
+          profilePicture: { type: "string", nullable: true },
+        },
+      },
+      CreateReviewRequest: {
+        type: "object",
+        required: ["serviceExchangeId", "rating", "comment"],
+        properties: {
+          serviceExchangeId: { type: "integer" },
+          rating: { type: "integer", minimum: 1, maximum: 5 },
+          comment: { type: "string", minLength: 1, maxLength: 1000 },
+        },
+      },
+      ReviewResponse: {
+        type: "object",
+        properties: {
+          review: { $ref: "#/components/schemas/Review" },
+        },
+      },
+      ReviewListResponse: {
+        type: "object",
+        properties: {
+          reviews: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Review" },
+          },
+          nextCursor: { type: "integer", nullable: true },
+        },
+      },
+      Review: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          rating: { type: "integer" },
+          comment: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+          reviewer: { $ref: "#/components/schemas/UserSummary" },
         },
       },
     },

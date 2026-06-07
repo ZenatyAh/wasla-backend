@@ -15,6 +15,8 @@ import chatRoutes from "./modules/chat/chat.routes.js";
 import messageRoutes from "./modules/chat/message.routes.js";
 import notificationRoutes from "./modules/notifications/notification.routes.js";
 import postRoutes from "./modules/posts/posts.routes.js";
+import reviewRoutes from "./modules/reviews/review.routes.js";
+import userRoutes from "./modules/users/users.routes.js";
 // import "./types/express.js";
 
 const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
@@ -77,6 +79,8 @@ app.use("/posts", postRoutes);
 app.use("/conversations", chatRoutes);
 app.use("/messages", messageRoutes);
 app.use("/notifications", notificationRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({
