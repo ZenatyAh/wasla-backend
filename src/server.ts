@@ -12,6 +12,7 @@ export default app;
 
 import authroutes from "./modules/auth/auth.routes.js";
 import chatRoutes from "./modules/chat/chat.routes.js";
+import exchangeRoutes from "./modules/exchanges/exchanges.routes.js";
 import messageRoutes from "./modules/chat/message.routes.js";
 import notificationRoutes from "./modules/notifications/notification.routes.js";
 import postRoutes from "./modules/posts/posts.routes.js";
@@ -76,6 +77,7 @@ app.get("/me", authMiddleware, (req, res) => {
 
 app.use("/auth", authroutes);
 app.use("/posts", postRoutes);
+app.use("/exchanges", exchangeRoutes);
 app.use("/conversations", chatRoutes);
 app.use("/messages", messageRoutes);
 app.use("/notifications", notificationRoutes);
