@@ -33,6 +33,10 @@ model User {
   sender Message[]
   MessageRead MessageReadReceipt[]
   notifications Notification[]
+  providedExchanges ServiceExchange[] @relation("ProvidedExchanges")
+  receivedExchanges ServiceExchange[] @relation("ReceivedExchanges")
+  reviewsGiven      Review[]          @relation("ReviewsGiven")
+  reviewsReceived   Review[]          @relation("ReviewsReceived")
   @@map("users")
 }
 
@@ -72,6 +76,7 @@ model Post {
   savedBy               SavedPost[]
 
   conversations Conversation[]
+  serviceExchanges ServiceExchange[]
   @@index([status])
   @@index([user_id])
   @@map("posts")
@@ -164,6 +169,13 @@ enum NotificationType {
   CONVERSATION_STARTED
 }
 
+enum ServiceExchangeStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
 model Conversation {
   id        String @id @default(cuid())
   postId    Int
@@ -234,4 +246,44 @@ model Notification {
 
   @@index([userId, isRead])
   @@map("notifications")
+}
+
+model ServiceExchange {
+  id           Int                   @id @default(autoincrement())
+  post_id      Int?
+  provider_id  Int
+  consumer_id  Int
+  time_credits Int
+  status       ServiceExchangeStatus @default(PENDING)
+  completed_at DateTime?
+  created_at   DateTime              @default(now())
+  updated_at   DateTime              @updatedAt
+
+  post     Post?    @relation(fields: [post_id], references: [id], onDelete: SetNull)
+  provider User     @relation("ProvidedExchanges", fields: [provider_id], references: [id])
+  consumer User     @relation("ReceivedExchanges", fields: [consumer_id], references: [id])
+  reviews  Review[]
+
+  @@index([provider_id, status])
+  @@index([consumer_id, status])
+  @@index([status, completed_at])
+  @@map("service_exchanges")
+}
+
+model Review {
+  id                  Int      @id @default(autoincrement())
+  service_exchange_id Int
+  reviewer_id         Int
+  reviewee_id         Int
+  rating              Int
+  comment             String
+  created_at          DateTime @default(now())
+
+  serviceExchange ServiceExchange @relation(fields: [service_exchange_id], references: [id], onDelete: Cascade)
+  reviewer        User            @relation("ReviewsGiven", fields: [reviewer_id], references: [id])
+  reviewee        User            @relation("ReviewsReceived", fields: [reviewee_id], references: [id])
+
+  @@unique([service_exchange_id, reviewer_id])
+  @@index([reviewee_id, created_at])
+  @@map("reviews")
 }
