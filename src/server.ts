@@ -11,22 +11,30 @@ const app = express();
 export default app;
 
 import authroutes from "./modules/auth/auth.routes.js";
+import chatRoutes from "./modules/chat/chat.routes.js";
+import messageRoutes from "./modules/chat/message.routes.js";
+import notificationRoutes from "./modules/notifications/notification.routes.js";
 import postRoutes from "./modules/posts/posts.routes.js";
 // import "./types/express.js";
 
+const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
+
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  "https://wasla-five.vercel.app",
   "http://localhost:3000",
   "http://localhost:5173",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:5173",
-].filter((origin): origin is string => Boolean(origin));
+]
+  .filter((origin): origin is string => Boolean(origin))
+  .map(normalizeOrigin);
 
 app.use(
   cors({
     origin(origin, callback) {
       // Allow non-browser clients (no Origin header) and allowlisted frontends.
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
         callback(null, true);
         return;
       }
@@ -66,6 +74,9 @@ app.get("/me", authMiddleware, (req, res) => {
 
 app.use("/auth", authroutes);
 app.use("/posts", postRoutes);
+app.use("/conversations", chatRoutes);
+app.use("/messages", messageRoutes);
+app.use("/notifications", notificationRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({
