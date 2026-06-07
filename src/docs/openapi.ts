@@ -45,6 +45,11 @@ export const openApiSpec = {
       name: "Reviews",
       description: "Service exchange reviews and ratings",
     },
+    {
+      name: "Exchanges",
+      description:
+        "Time-credit service exchange (contract) lifecycle with escrow: request, accept, reject, deliver, confirm, cancel, and dispute",
+    },
   ],
   paths: {
     "/": {
@@ -1093,6 +1098,362 @@ export const openApiSpec = {
         },
       },
     },
+    "/exchanges/request": {
+      post: {
+        tags: ["Exchanges"],
+        summary: "Request a service exchange (create contract)",
+        description:
+          "Creates a PENDING contract. No time credits are deducted at this stage. The requester is the authenticated user; you cannot request a service from yourself, and you must currently hold at least `duration` available credits.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateExchangeRequest" },
+              example: { postId: 1, providerId: 2, duration: 3 },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Contract created in PENDING state",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    exchange: { $ref: "#/components/schemas/Exchange" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { description: "Post or provider not found" },
+        },
+      },
+    },
+    "/exchanges": {
+      get: {
+        tags: ["Exchanges"],
+        summary: "List my contracts (as requester or provider)",
+        description:
+          "Returns the authenticated user's contracts with offset pagination. Filter by role and status.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "role",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["provider", "requester"] },
+            description: "Restrict to contracts where the user is the provider or the requester. Omit for either.",
+          },
+          {
+            name: "status",
+            in: "query",
+            required: false,
+            schema: { $ref: "#/components/schemas/ExchangeStatus" },
+          },
+          {
+            name: "page",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, default: 1 },
+          },
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Paginated list of contracts",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ExchangeListResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/exchanges/{id}": {
+      get: {
+        tags: ["Exchanges"],
+        summary: "Get a contract by ID",
+        description: "Only a participant (requester or provider) may view the contract.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            example: 1,
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Contract details",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    exchange: { $ref: "#/components/schemas/Exchange" },
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Exchange not found" },
+        },
+      },
+    },
+    "/exchanges/{id}/accept": {
+      put: {
+        tags: ["Exchanges"],
+        summary: "Accept a contract (provider only)",
+        description:
+          "Provider-only. The contract must be PENDING. Runs in a serializable transaction: re-checks the requester's available credits, then deducts `duration` from available and moves it into escrow (HELD). Fails if the requester no longer has enough credits.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            example: 1,
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Contract moved to IN_PROGRESS with escrow HELD",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    exchange: { $ref: "#/components/schemas/Exchange" },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Not pending, or requester has insufficient credits",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Exchange not found" },
+          "409": { description: "Contract is no longer pending (concurrent change)" },
+        },
+      },
+    },
+    "/exchanges/{id}/reject": {
+      put: {
+        tags: ["Exchanges"],
+        summary: "Reject a contract (provider only)",
+        description: "Provider-only. The contract must be PENDING. No credit changes.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            example: 1,
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Contract moved to REJECTED",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    exchange: { $ref: "#/components/schemas/Exchange" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Exchange not found" },
+        },
+      },
+    },
+    "/exchanges/{id}/deliver": {
+      put: {
+        tags: ["Exchanges"],
+        summary: "Mark a contract as delivered (provider only)",
+        description:
+          "Provider-only. The contract must be IN_PROGRESS. Moves it to WAITING_CONFIRMATION. Credits remain frozen in escrow.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            example: 1,
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Contract moved to WAITING_CONFIRMATION",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    exchange: { $ref: "#/components/schemas/Exchange" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Exchange not found" },
+        },
+      },
+    },
+    "/exchanges/{id}/confirm": {
+      put: {
+        tags: ["Exchanges"],
+        summary: "Confirm delivery (requester only)",
+        description:
+          "Requester-only. The contract must be WAITING_CONFIRMATION. Runs in a serializable transaction: releases escrow from the requester, credits the provider, increments both users' service stats, writes a TRANSFER ledger entry, and sets the contract to COMPLETED / escrow RELEASED.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            example: 1,
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Contract COMPLETED, credits transferred to provider",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    exchange: { $ref: "#/components/schemas/Exchange" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Exchange not found" },
+          "409": { description: "Contract is no longer awaiting confirmation" },
+        },
+      },
+    },
+    "/exchanges/{id}/cancel": {
+      put: {
+        tags: ["Exchanges"],
+        summary: "Cancel a contract",
+        description:
+          "If PENDING: either participant may cancel (no credit changes), moving it to CANCELED. If IN_PROGRESS or WAITING_CONFIRMATION: a provider cancel refunds the escrow to the requester (CANCELED / REFUNDED), while a requester cancel cannot unilaterally close it and instead escalates to DISPUTED with credits left frozen.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            example: 1,
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Contract CANCELED (refunded if applicable) or DISPUTED",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    exchange: { $ref: "#/components/schemas/Exchange" },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Contract cannot be canceled from its current status",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Exchange not found" },
+          "409": { description: "Contract state changed concurrently" },
+        },
+      },
+    },
+    "/exchanges/{id}/dispute": {
+      post: {
+        tags: ["Exchanges"],
+        summary: "Open a dispute on a contract",
+        description:
+          "Participant-only. The contract must be IN_PROGRESS or WAITING_CONFIRMATION. Moves it to DISPUTED; credits remain frozen in escrow until an admin resolves it.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            example: 1,
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Contract moved to DISPUTED, credits remain frozen",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    exchange: { $ref: "#/components/schemas/Exchange" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Exchange not found" },
+        },
+      },
+    },
     "/realtime/chat": {
       get: {
         tags: ["Chat"],
@@ -1602,6 +1963,101 @@ export const openApiSpec = {
           comment: { type: "string" },
           createdAt: { type: "string", format: "date-time" },
           reviewer: { $ref: "#/components/schemas/UserSummary" },
+        },
+      },
+      ExchangeStatus: {
+        type: "string",
+        enum: [
+          "PENDING",
+          "ACCEPTED",
+          "IN_PROGRESS",
+          "WAITING_CONFIRMATION",
+          "COMPLETED",
+          "CANCELED",
+          "REJECTED",
+          "DISPUTED",
+        ],
+        example: "PENDING",
+      },
+      EscrowStatus: {
+        type: "string",
+        enum: ["NONE", "HELD", "RELEASED", "REFUNDED"],
+        example: "NONE",
+      },
+      CreateExchangeRequest: {
+        type: "object",
+        required: ["postId", "providerId", "duration"],
+        properties: {
+          postId: { type: "integer", example: 1 },
+          providerId: { type: "integer", example: 2 },
+          duration: {
+            type: "integer",
+            minimum: 1,
+            maximum: 100000,
+            description: "Number of time credits the service costs",
+            example: 3,
+          },
+        },
+      },
+      Exchange: {
+        type: "object",
+        properties: {
+          id: { type: "integer", example: 1 },
+          postId: { type: "integer", nullable: true, example: 1 },
+          requesterId: { type: "integer", example: 1 },
+          providerId: { type: "integer", example: 2 },
+          duration: { type: "integer", example: 3 },
+          status: { $ref: "#/components/schemas/ExchangeStatus" },
+          escrowStatus: { $ref: "#/components/schemas/EscrowStatus" },
+          acceptedAt: { type: "string", format: "date-time", nullable: true },
+          deliveredAt: { type: "string", format: "date-time", nullable: true },
+          completedAt: { type: "string", format: "date-time", nullable: true },
+          canceledAt: { type: "string", format: "date-time", nullable: true },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+          requester: { $ref: "#/components/schemas/ExchangeParticipant" },
+          provider: { $ref: "#/components/schemas/ExchangeParticipant" },
+          post: {
+            type: "object",
+            nullable: true,
+            properties: {
+              id: { type: "integer" },
+              title: { type: "string" },
+              category: { type: "string", enum: ["OFFER", "REQUEST"] },
+              service_mode: { type: "string", enum: ["ONLINE", "OFFLINE"] },
+            },
+          },
+        },
+      },
+      ExchangeParticipant: {
+        type: "object",
+        properties: {
+          id: { type: "integer", example: 1 },
+          username: { type: "string", example: "ahmed_zenaty_test" },
+          full_name: { type: "string", example: "Ahmed Zenaty" },
+          profile_image: {
+            type: "string",
+            nullable: true,
+            example: "https://example.com/avatar.png",
+          },
+        },
+      },
+      ExchangeListResponse: {
+        type: "object",
+        properties: {
+          data: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Exchange" },
+          },
+          meta: {
+            type: "object",
+            properties: {
+              page: { type: "integer", example: 1 },
+              limit: { type: "integer", example: 20 },
+              total: { type: "integer", example: 1 },
+              totalPages: { type: "integer", example: 1 },
+            },
+          },
         },
       },
     },
