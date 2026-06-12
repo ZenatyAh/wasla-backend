@@ -4,7 +4,7 @@ export const openApiSpec = {
     title: "Wasla Backend API",
     version: "1.0.0",
     description:
-      "API documentation for Wasla backend including auth, posts, chat, notifications, and real-time messaging.",
+      "API documentation for Wasla backend including auth, posts, skills, chat, notifications, and real-time messaging.",
   },
   servers: [
     {
@@ -46,6 +46,10 @@ export const openApiSpec = {
     {
       name: "Reviews",
       description: "Service exchange reviews and ratings",
+    },
+    {
+      name: "Skills",
+      description: "Platform skill catalog for registration and profile selection",
     },
     {
       name: "Exchanges",
@@ -1280,6 +1284,100 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/skills": {
+      get: {
+        tags: ["Skills"],
+        summary: "List approved skills",
+        description:
+          "Returns all approved skills ordered by name. Optionally filter by category.",
+        parameters: [
+          {
+            name: "category",
+            in: "query",
+            required: false,
+            schema: { $ref: "#/components/schemas/SkillCategory" },
+            description: "Filter skills by category",
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Approved skill list",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SkillListResponse" },
+                example: {
+                  skills: [
+                    {
+                      id: 1,
+                      name: "Web Development",
+                      category: "TECHNICAL",
+                      isApproved: true,
+                    },
+                    {
+                      id: 2,
+                      name: "Translation",
+                      category: "GENERAL",
+                      isApproved: true,
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+        },
+      },
+      post: {
+        tags: ["Skills"],
+        summary: "Create a new skill",
+        description:
+          "Adds a skill to the platform catalog. Duplicate names (case-insensitive) return 409.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateSkillRequest" },
+              example: {
+                name: "Data Analysis",
+                category: "TECHNICAL",
+              },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Skill created",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/SkillResponse" },
+                example: {
+                  skill: {
+                    id: 7,
+                    name: "Data Analysis",
+                    category: "TECHNICAL",
+                    isApproved: true,
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "409": {
+            description: "Skill already exists",
+            content: {
+              "application/json": {
+                example: {
+                  status: "fail",
+                  message: "Skill already exists",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     "/exchanges/request": {
       post: {
         tags: ["Exchanges"],
@@ -2332,6 +2430,43 @@ export const openApiSpec = {
             items: { $ref: "#/components/schemas/Review" },
           },
           nextCursor: { type: "integer", nullable: true },
+        },
+      },
+      SkillCategory: {
+        type: "string",
+        enum: ["TECHNICAL", "GENERAL"],
+        example: "TECHNICAL",
+      },
+      Skill: {
+        type: "object",
+        properties: {
+          id: { type: "integer", example: 1 },
+          name: { type: "string", example: "Web Development" },
+          category: { $ref: "#/components/schemas/SkillCategory" },
+          isApproved: { type: "boolean", example: true },
+        },
+      },
+      SkillListResponse: {
+        type: "object",
+        properties: {
+          skills: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Skill" },
+          },
+        },
+      },
+      CreateSkillRequest: {
+        type: "object",
+        required: ["name", "category"],
+        properties: {
+          name: { type: "string", minLength: 2, maxLength: 100, example: "Data Analysis" },
+          category: { $ref: "#/components/schemas/SkillCategory" },
+        },
+      },
+      SkillResponse: {
+        type: "object",
+        properties: {
+          skill: { $ref: "#/components/schemas/Skill" },
         },
       },
       Review: {
