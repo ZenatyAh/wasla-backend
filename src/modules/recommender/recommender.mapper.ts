@@ -46,7 +46,7 @@ export const SERVICE_MODE_LABEL: Record<string, string> = {
   OFFLINE: "وجاهي",
 };
 
-type SkillRow = { skill_type: "OFFER" | "REQUEST"; skill: { skill_name: string } };
+type SkillRow = { skill_type: "OFFER" | "REQUEST"; skill: { name: string } };
 
 export type UserForMapping = {
   id: number;
@@ -66,10 +66,10 @@ export const mapUser = (
   user_id: String(user.id),
   skills: user.skills
     .filter((s) => s.skill_type === "OFFER")
-    .map((s) => s.skill.skill_name),
+    .map((s) => s.skill.name),
   needs: user.skills
     .filter((s) => s.skill_type === "REQUEST")
-    .map((s) => s.skill.skill_name),
+    .map((s) => s.skill.name),
   location: user.location ?? "",
   time_balance: user.available_balance,
   trust_score: Number(trustScore.toFixed(2)),
@@ -100,7 +100,7 @@ export const mapPost = (post: PostForMapping): RecommenderPost => {
   const wantedSkillType = post.category === "REQUEST" ? "REQUEST" : "OFFER";
   const derivedCategory =
     post.user.skills.find((s) => s.skill_type === wantedSkillType)?.skill
-      .skill_name ?? "";
+      .name ?? "";
 
   return {
     post_id: String(post.id),
