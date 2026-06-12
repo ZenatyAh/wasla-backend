@@ -97,7 +97,14 @@ export const deletePostController = async (req: Request, res: Response) => {
 
     return res.status(204).end()
   } catch (err: unknown) {
-    return sendError(res, 400, getErrorMessage(err, "Delete post failed"));
+    const message = getErrorMessage(err, "Delete post failed")
+    const statusCode =
+      message === "Post not found"
+        ? 404
+        : message === "You can only delete your own posts"
+          ? 403
+          : 400
+    return sendError(res, statusCode, message)
   }
 };
 

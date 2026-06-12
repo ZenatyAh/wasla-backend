@@ -21,7 +21,6 @@ export const messageInclude = {
     select: {
       id: true,
       username: true,
-      email: true,
     },
   },
   readReceipts: {

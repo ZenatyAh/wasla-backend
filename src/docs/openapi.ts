@@ -19,7 +19,8 @@ export const openApiSpec = {
     },
     {
       name: "Auth",
-      description: "Authentication and session endpoints",
+      description:
+        "Authentication and session endpoints. Refresh token cookie: production uses HttpOnly, SameSite=None, Secure; local development uses SameSite=Lax.",
     },
     {
       name: "User",
@@ -31,7 +32,8 @@ export const openApiSpec = {
     },
     {
       name: "Chat",
-      description: "1:1 post-linked conversations, messages, and Socket.IO events",
+      description:
+        "1:1 post-linked conversations and messages. Real-time updates via Socket.IO: connect with access JWT in auth.token. Client events: chat:join, chat:leave. Server events: chat:message:new, chat:message:edited, chat:message:deleted, chat:message:read, chat:notification:new, chat:error.",
     },
     {
       name: "Notifications",
@@ -49,6 +51,15 @@ export const openApiSpec = {
       name: "Exchanges",
       description:
         "Time-credit service exchange (contract) lifecycle with escrow: request, accept, reject, deliver, confirm, cancel, and dispute",
+    },
+    {
+      name: "Feed",
+      description: "Personalized post feed proxied from the recommender service",
+    },
+    {
+      name: "Internal",
+      description:
+        "Machine-to-machine endpoints protected by X-Internal-Token. Not for public clients.",
     },
   ],
   paths: {
@@ -708,6 +719,17 @@ export const openApiSpec = {
           "401": {
             $ref: "#/components/responses/Unauthorized",
           },
+          "403": {
+            description: "Not the post owner",
+            content: {
+              "application/json": {
+                example: {
+                  status: "fail",
+                  message: "You can only delete your own posts",
+                },
+              },
+            },
+          },
           "404": {
             description: "Post not found",
             content: {
@@ -830,8 +852,22 @@ export const openApiSpec = {
           },
         },
         responses: {
-          "201": { description: "Conversation created" },
-          "200": { description: "Existing conversation reused" },
+          "201": {
+            description: "Conversation created",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationResponse" },
+              },
+            },
+          },
+          "200": {
+            description: "Existing conversation reused",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationResponse" },
+              },
+            },
+          },
           "400": { $ref: "#/components/responses/BadRequest" },
           "401": { $ref: "#/components/responses/Unauthorized" },
           "404": { description: "Post or recipient not found" },
@@ -846,7 +882,14 @@ export const openApiSpec = {
           { name: "limit", in: "query", schema: { type: "integer", default: 20 } },
         ],
         responses: {
-          "200": { description: "Paginated conversations" },
+          "200": {
+            description: "Paginated conversations",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationListResponse" },
+              },
+            },
+          },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
@@ -860,7 +903,14 @@ export const openApiSpec = {
           { name: "conversationId", in: "path", required: true, schema: { type: "string" } },
         ],
         responses: {
-          "200": { description: "Conversation details" },
+          "200": {
+            description: "Conversation details",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationResponse" },
+              },
+            },
+          },
           "401": { $ref: "#/components/responses/Unauthorized" },
           "403": { $ref: "#/components/responses/Forbidden" },
           "404": { description: "Conversation not found" },
@@ -878,7 +928,15 @@ export const openApiSpec = {
           { name: "limit", in: "query", schema: { type: "integer", default: 30 } },
         ],
         responses: {
-          "200": { description: "Paginated messages" },
+          "200": {
+            description: "Paginated messages",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/MessageListResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
           "403": { $ref: "#/components/responses/Forbidden" },
         },
       },
@@ -899,8 +957,16 @@ export const openApiSpec = {
           },
         },
         responses: {
-          "201": { description: "Message sent" },
+          "201": {
+            description: "Message sent",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/MessageResponse" },
+              },
+            },
+          },
           "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
           "403": { $ref: "#/components/responses/Forbidden" },
           "429": { $ref: "#/components/responses/TooManyRequests" },
         },
@@ -921,7 +987,15 @@ export const openApiSpec = {
           },
         },
         responses: {
-          "200": { description: "Message updated" },
+          "200": {
+            description: "Message updated",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/MessageResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
           "403": { $ref: "#/components/responses/Forbidden" },
         },
       },
@@ -931,7 +1005,15 @@ export const openApiSpec = {
         security: [{ bearerAuth: [] }],
         parameters: [{ name: "messageId", in: "path", required: true, schema: { type: "string" } }],
         responses: {
-          "200": { description: "Message soft-deleted" },
+          "200": {
+            description: "Message soft-deleted",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/MessageResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
           "403": { $ref: "#/components/responses/Forbidden" },
         },
       },
@@ -943,7 +1025,15 @@ export const openApiSpec = {
         security: [{ bearerAuth: [] }],
         parameters: [{ name: "messageId", in: "path", required: true, schema: { type: "string" } }],
         responses: {
-          "200": { description: "Read receipt recorded" },
+          "200": {
+            description: "Read receipt recorded",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ReadReceiptResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
           "403": { $ref: "#/components/responses/Forbidden" },
         },
       },
@@ -953,8 +1043,23 @@ export const openApiSpec = {
         tags: ["Notifications"],
         summary: "List notifications",
         security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "cursor", in: "query", schema: { type: "string" } },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", default: 20, maximum: 50 },
+          },
+        ],
         responses: {
-          "200": { description: "Notification list" },
+          "200": {
+            description: "Notification list",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/NotificationListResponse" },
+              },
+            },
+          },
           "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
@@ -965,7 +1070,15 @@ export const openApiSpec = {
         summary: "Mark all notifications as read",
         security: [{ bearerAuth: [] }],
         responses: {
-          "200": { description: "All notifications marked as read" },
+          "200": {
+            description: "All notifications marked as read",
+            content: {
+              "application/json": {
+                example: { message: "All notifications marked as read" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
     },
@@ -976,7 +1089,15 @@ export const openApiSpec = {
         security: [{ bearerAuth: [] }],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
         responses: {
-          "200": { description: "Notification marked as read" },
+          "200": {
+            description: "Notification marked as read",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/NotificationResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
           "404": { description: "Notification not found" },
         },
       },
@@ -1515,14 +1636,49 @@ export const openApiSpec = {
         },
       },
     },
-    "/realtime/chat": {
+    "/feed/{userId}": {
       get: {
-        tags: ["Chat"],
-        summary: "Socket.IO events reference (documentation only)",
+        tags: ["Feed"],
+        summary: "Get personalized post feed",
         description:
-          "Connect via Socket.IO using JWT in auth.token. Client events: chat:join, chat:leave. Server events: chat:message:new, chat:message:edited, chat:message:deleted, chat:message:read, chat:notification:new, chat:error.",
+          "Returns published posts ordered by the recommender when available. Falls back to chronological posts when the recommender is disabled or unavailable.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "userId",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+            example: 1,
+          },
+        ],
         responses: {
-          "200": { description: "Documentation reference only" },
+          "200": {
+            description: "Feed posts",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/FeedResponse" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/internal/recommender-export": {
+      get: {
+        tags: ["Internal"],
+        summary: "Export recommender snapshot",
+        description:
+          "Full snapshot of users, posts, and interactions for recommender bootstrap. Requires X-Internal-Token header.",
+        security: [{ internalTokenAuth: [] }],
+        responses: {
+          "200": {
+            description: "Export payload (users, posts, interactions arrays)",
+          },
+          "401": { description: "Invalid internal token" },
+          "503": { description: "Recommender integration disabled" },
         },
       },
     },
@@ -1533,6 +1689,11 @@ export const openApiSpec = {
         type: "http",
         scheme: "bearer",
         bearerFormat: "JWT",
+      },
+      internalTokenAuth: {
+        type: "apiKey",
+        in: "header",
+        name: "X-Internal-Token",
       },
     },
     schemas: {
@@ -1549,6 +1710,8 @@ export const openApiSpec = {
             type: "string",
             minLength: 8,
             maxLength: 50,
+            description:
+              "Must include at least one uppercase letter, lowercase letter, digit, and special character.",
             example: "OldPass@123",
           },
         },
@@ -1577,6 +1740,8 @@ export const openApiSpec = {
             type: "string",
             minLength: 8,
             maxLength: 50,
+            description:
+              "Must include at least one uppercase letter, lowercase letter, digit, and special character.",
             example: "NewPass@123",
           },
         },
@@ -1602,6 +1767,8 @@ export const openApiSpec = {
             type: "string",
             minLength: 3,
             maxLength: 50,
+            description:
+              "At least 3 English letters; may include numbers and symbols.",
             example: "ahmed_zenaty_test",
           },
           email: {
@@ -1613,12 +1780,15 @@ export const openApiSpec = {
             type: "string",
             minLength: 8,
             maxLength: 50,
+            description:
+              "Must include at least one uppercase letter, lowercase letter, digit, and special character.",
             example: "OldPass@123",
           },
           bio: {
             type: "string",
             minLength: 50,
             maxLength: 200,
+            description: "Optional. May be omitted or sent as an empty string.",
             example:
               "I am a test user for checking authentication and password reset flow in the Wasla backend application.",
           },
@@ -1629,6 +1799,7 @@ export const openApiSpec = {
           },
           location: {
             type: "string",
+            minLength: 3,
             example: "Ramallah",
           },
           offeredSkills: {
@@ -1669,8 +1840,15 @@ export const openApiSpec = {
           },
           user: {
             type: "object",
+            properties: {
+              id: { type: "integer", example: 1 },
+              email: { type: "string", format: "email" },
+              username: { type: "string", example: "ahmed_zenaty_test" },
+            },
+            required: ["id", "email", "username"],
           },
         },
+        required: ["accessToken", "user"],
       },
       ErrorResponse: {
         type: "object",
@@ -1684,6 +1862,28 @@ export const openApiSpec = {
             example: "Invalid request data",
           },
         },
+      },
+      PostResponse: {
+        type: "object",
+        properties: {
+          post: { $ref: "#/components/schemas/Post" },
+        },
+        required: ["post"],
+      },
+      FeedResponse: {
+        type: "object",
+        properties: {
+          posts: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Post" },
+          },
+          source: {
+            type: "string",
+            enum: ["recommender", "fallback"],
+            example: "recommender",
+          },
+        },
+        required: ["posts", "source"],
       },
       CreatePostRequest: {
         type: "object",
@@ -1881,10 +2081,69 @@ export const openApiSpec = {
           id: { type: "string" },
           conversationId: { type: "string" },
           senderId: { type: "integer" },
+          sender: {
+            type: "object",
+            properties: {
+              id: { type: "integer" },
+              username: { type: "string" },
+            },
+          },
           body: { type: "string", nullable: true },
           createdAt: { type: "string", format: "date-time" },
           editedAt: { type: "string", format: "date-time", nullable: true },
           deletedAt: { type: "string", format: "date-time", nullable: true },
+          readBy: {
+            type: "array",
+            items: { $ref: "#/components/schemas/ReadReceipt" },
+          },
+        },
+      },
+      ReadReceipt: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          messageId: { type: "string" },
+          userId: { type: "integer" },
+          readAt: { type: "string", format: "date-time" },
+        },
+      },
+      MessageResponse: {
+        type: "object",
+        properties: {
+          message: { $ref: "#/components/schemas/Message" },
+        },
+      },
+      MessageListResponse: {
+        type: "object",
+        properties: {
+          messages: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Message" },
+          },
+          nextCursor: { type: "string", nullable: true },
+        },
+      },
+      ReadReceiptResponse: {
+        type: "object",
+        properties: {
+          readReceipt: { $ref: "#/components/schemas/ReadReceipt" },
+        },
+      },
+      ChatParticipantUser: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          username: { type: "string" },
+          full_name: { type: "string" },
+          profile_image: { type: "string", nullable: true },
+        },
+      },
+      ConversationParticipant: {
+        type: "object",
+        properties: {
+          userId: { type: "integer" },
+          joinedAt: { type: "string", format: "date-time" },
+          user: { $ref: "#/components/schemas/ChatParticipantUser" },
         },
       },
       Conversation: {
@@ -1892,9 +2151,40 @@ export const openApiSpec = {
         properties: {
           id: { type: "string" },
           postId: { type: "integer" },
+          post: {
+            type: "object",
+            properties: {
+              id: { type: "integer" },
+              title: { type: "string" },
+            },
+          },
+          participants: {
+            type: "array",
+            items: { $ref: "#/components/schemas/ConversationParticipant" },
+          },
+          lastMessage: {
+            allOf: [{ $ref: "#/components/schemas/Message" }],
+            nullable: true,
+          },
           unreadCount: { type: "integer" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      ConversationResponse: {
+        type: "object",
+        properties: {
+          conversation: { $ref: "#/components/schemas/Conversation" },
+        },
+      },
+      ConversationListResponse: {
+        type: "object",
+        properties: {
+          conversations: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Conversation" },
+          },
+          nextCursor: { type: "string", nullable: true },
         },
       },
       Notification: {
@@ -1905,8 +2195,25 @@ export const openApiSpec = {
           type: { type: "string", enum: ["NEW_MESSAGE", "CONVERSATION_STARTED"] },
           title: { type: "string" },
           body: { type: "string" },
+          data: { type: "object", nullable: true, additionalProperties: true },
           isRead: { type: "boolean" },
           createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      NotificationResponse: {
+        type: "object",
+        properties: {
+          notification: { $ref: "#/components/schemas/Notification" },
+        },
+      },
+      NotificationListResponse: {
+        type: "object",
+        properties: {
+          notifications: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Notification" },
+          },
+          nextCursor: { type: "string", nullable: true },
         },
       },
       DeleteAccountRequest: {

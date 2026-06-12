@@ -116,10 +116,10 @@ export const updateUserProfile = async (
 export const assertUserExists = async (userId: number) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true },
+    select: { id: true, deleted_at: true },
   });
 
-  if (!user) {
+  if (!user || user.deleted_at) {
     throw new ChatError("User not found", 404);
   }
 };

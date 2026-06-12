@@ -170,6 +170,8 @@ if (!hasTestDatabase) {
 
       assert.equal(response.status, 201);
       assert.equal(response.body.message.body, "مرحباً، هل الخدمة متاحة؟");
+      assert.equal(response.body.message.sender?.email, undefined);
+      assert.ok(response.body.message.sender?.username);
       messageId = response.body.message.id;
     });
 
