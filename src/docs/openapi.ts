@@ -1106,7 +1106,7 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/users/account": {
+    "/users/account": {
       delete: {
         tags: ["Profile"],
         summary: "Delete current user account",
@@ -1167,7 +1167,7 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/users/profile": {
+    "/users/profile": {
       put: {
         tags: ["Profile"],
         summary: "Update current user profile",
@@ -1194,7 +1194,7 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/users/{id}/profile": {
+    "/users/{id}/profile": {
       get: {
         tags: ["Profile"],
         summary: "Get user profile with stats and recent exchanges",
@@ -1221,7 +1221,7 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/users/{id}/reviews": {
+    "/users/{id}/reviews": {
       get: {
         tags: ["Reviews"],
         summary: "List reviews received by a user",
@@ -1254,7 +1254,7 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/reviews": {
+    "/reviews": {
       post: {
         tags: ["Reviews"],
         summary: "Submit a review for a completed service exchange",
@@ -1284,7 +1284,7 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/skills": {
+    "/skills": {
       get: {
         tags: ["Skills"],
         summary: "List approved skills",

@@ -108,7 +108,7 @@ if (!hasTestDatabase) {
 
     it("returns 401 without auth token", async () => {
       const response = await request(app)
-        .delete("/api/users/account")
+        .delete("/users/account")
         .send({ password });
 
       assert.equal(response.status, 401);
@@ -116,7 +116,7 @@ if (!hasTestDatabase) {
 
     it("returns 400 when password is missing", async () => {
       const response = await request(app)
-        .delete("/api/users/account")
+        .delete("/users/account")
         .set(authHeader(userToken))
         .send({});
 
@@ -125,7 +125,7 @@ if (!hasTestDatabase) {
 
     it("returns 409 when user has active service exchanges", async () => {
       const response = await request(app)
-        .delete("/api/users/account")
+        .delete("/users/account")
         .set(authHeader(userToken))
         .send({ password });
 
@@ -143,7 +143,7 @@ if (!hasTestDatabase) {
       pendingExchangeId = 0;
 
       const response = await request(app)
-        .delete("/api/users/account")
+        .delete("/users/account")
         .set(authHeader(userToken))
         .send({ password: "WrongPass@123" });
 
@@ -153,7 +153,7 @@ if (!hasTestDatabase) {
 
     it("deletes account with correct password and blocks further access", async () => {
       const response = await request(app)
-        .delete("/api/users/account")
+        .delete("/users/account")
         .set(authHeader(userToken))
         .send({ password });
 
@@ -167,7 +167,7 @@ if (!hasTestDatabase) {
       assert.match(loginResponse.body.message, /Invalid credentials/i);
 
       const profileResponse = await request(app)
-        .get(`/api/users/${userId}/profile`)
+        .get(`/users/${userId}/profile`)
         .set(authHeader(userToken));
 
       assert.equal(profileResponse.status, 401);
@@ -190,7 +190,7 @@ if (!hasTestDatabase) {
       assert.equal(deletedUser?.available_balance, 0);
 
       const reviewsResponse = await request(app)
-        .get(`/api/users/${userId}/reviews`)
+        .get(`/users/${userId}/reviews`)
         .set(authHeader(signAccessToken(String(counterpartyId))));
 
       assert.equal(reviewsResponse.status, 404);

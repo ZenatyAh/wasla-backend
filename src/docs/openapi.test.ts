@@ -63,8 +63,8 @@ describe("OpenAPI spec", () => {
   });
 
   it("documents skills routes", () => {
-    assert.ok("/api/skills" in openApiSpec.paths);
-    assert.ok("get" in openApiSpec.paths["/api/skills"]);
-    assert.ok("post" in openApiSpec.paths["/api/skills"]);
+    assert.ok("/skills" in openApiSpec.paths);
+    assert.ok("get" in openApiSpec.paths["/skills"]);
+    assert.ok("post" in openApiSpec.paths["/skills"]);
   });
 });

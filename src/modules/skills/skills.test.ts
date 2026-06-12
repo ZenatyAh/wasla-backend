@@ -67,8 +67,8 @@ if (!hasTestDatabase) {
       await prisma.$disconnect();
     });
 
-    it("GET /api/skills returns approved skills", async () => {
-      const response = await request(app).get("/api/skills");
+    it("GET /skills returns approved skills", async () => {
+      const response = await request(app).get("/skills");
 
       assert.equal(response.status, 200);
       assert.ok(Array.isArray(response.body.skills));
@@ -84,8 +84,8 @@ if (!hasTestDatabase) {
       );
     });
 
-    it("GET /api/skills?category=TECHNICAL filters by category", async () => {
-      const response = await request(app).get("/api/skills?category=TECHNICAL");
+    it("GET /skills?category=TECHNICAL filters by category", async () => {
+      const response = await request(app).get("/skills?category=TECHNICAL");
 
       assert.equal(response.status, 200);
       assert.ok(
@@ -105,19 +105,19 @@ if (!hasTestDatabase) {
       );
     });
 
-    it("POST /api/skills without token returns 401", async () => {
+    it("POST /skills without token returns 401", async () => {
       const response = await request(app)
-        .post("/api/skills")
+        .post("/skills")
         .send({ name: "Unauthorized Skill", category: "GENERAL" });
 
       assert.equal(response.status, 401);
     });
 
-    it("POST /api/skills with token creates a skill", async () => {
+    it("POST /skills with token creates a skill", async () => {
       const skillName = `Created Skill ${runId}`;
 
       const response = await request(app)
-        .post("/api/skills")
+        .post("/skills")
         .set({ Authorization: `Bearer ${token}` })
         .send({ name: skillName, category: "TECHNICAL" });
 
@@ -129,18 +129,18 @@ if (!hasTestDatabase) {
       await prisma.skill.delete({ where: { id: response.body.skill.id } });
     });
 
-    it("POST /api/skills returns 409 for duplicate skill", async () => {
+    it("POST /skills returns 409 for duplicate skill", async () => {
       const duplicateName = `Duplicate Skill ${runId}`;
 
       const first = await request(app)
-        .post("/api/skills")
+        .post("/skills")
         .set({ Authorization: `Bearer ${token}` })
         .send({ name: duplicateName, category: "GENERAL" });
 
       assert.equal(first.status, 201);
 
       const second = await request(app)
-        .post("/api/skills")
+        .post("/skills")
         .set({ Authorization: `Bearer ${token}` })
         .send({ name: duplicateName, category: "GENERAL" });
 

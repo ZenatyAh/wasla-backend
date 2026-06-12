@@ -86,9 +86,9 @@ app.use("/exchanges", exchangeRoutes);
 app.use("/conversations", chatRoutes);
 app.use("/messages", messageRoutes);
 app.use("/notifications", notificationRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/reviews", reviewRoutes);
-app.use("/api/skills", skillRoutes);
+app.use("/users", userRoutes);
+app.use("/reviews", reviewRoutes);
+app.use("/skills", skillRoutes);
 app.use("/feed", feedRouter);
 app.use("/internal", internalRecommenderRouter);
 

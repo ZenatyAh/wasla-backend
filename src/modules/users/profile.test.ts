@@ -117,14 +117,14 @@ if (!hasTestDatabase) {
     });
 
     it("returns 401 without auth token", async () => {
-      const response = await request(app).get(`/api/users/${providerId}/profile`);
+      const response = await request(app).get(`/users/${providerId}/profile`);
 
       assert.equal(response.status, 401);
     });
 
     it("returns profile with stats and trust rating", async () => {
       const response = await request(app)
-        .get(`/api/users/${providerId}/profile`)
+        .get(`/users/${providerId}/profile`)
         .set(authHeader(consumerToken));
 
       assert.equal(response.status, 200);
@@ -145,7 +145,7 @@ if (!hasTestDatabase) {
 
     it("returns 404 for non-existent user", async () => {
       const response = await request(app)
-        .get("/api/users/999999/profile")
+        .get("/users/999999/profile")
         .set(authHeader(consumerToken));
 
       assert.equal(response.status, 404);
@@ -153,7 +153,7 @@ if (!hasTestDatabase) {
 
     it("updates current user profile", async () => {
       const response = await request(app)
-        .put("/api/users/profile")
+        .put("/users/profile")
         .set(authHeader(providerToken))
         .send({
           bio: "Updated provider bio",

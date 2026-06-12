@@ -131,7 +131,7 @@ if (!hasTestDatabase) {
     });
 
     it("returns 401 without auth token", async () => {
-      const response = await request(app).post("/api/reviews").send({
+      const response = await request(app).post("/reviews").send({
         serviceExchangeId: exchangeId,
         rating: 5,
         comment: "Great!",
@@ -142,7 +142,7 @@ if (!hasTestDatabase) {
 
     it("creates a review from the other participant", async () => {
       const response = await request(app)
-        .post("/api/reviews")
+        .post("/reviews")
         .set(authHeader(providerToken))
         .send({
           serviceExchangeId: exchangeId,
@@ -157,7 +157,7 @@ if (!hasTestDatabase) {
 
     it("rejects duplicate review from same reviewer", async () => {
       const response = await request(app)
-        .post("/api/reviews")
+        .post("/reviews")
         .set(authHeader(consumerToken))
         .send({
           serviceExchangeId: exchangeId,
@@ -170,7 +170,7 @@ if (!hasTestDatabase) {
 
     it("rejects review from non-participant", async () => {
       const response = await request(app)
-        .post("/api/reviews")
+        .post("/reviews")
         .set(authHeader(outsiderToken))
         .send({
           serviceExchangeId: exchangeId,
@@ -183,7 +183,7 @@ if (!hasTestDatabase) {
 
     it("lists reviews for a user with pagination", async () => {
       const response = await request(app)
-        .get(`/api/users/${providerId}/reviews`)
+        .get(`/users/${providerId}/reviews`)
         .set(authHeader(consumerToken));
 
       assert.equal(response.status, 200);
@@ -197,7 +197,7 @@ if (!hasTestDatabase) {
 
     it("returns 404 when listing reviews for non-existent user", async () => {
       const response = await request(app)
-        .get("/api/users/999999/reviews")
+        .get("/users/999999/reviews")
         .set(authHeader(consumerToken));
 
       assert.equal(response.status, 404);
