@@ -55,9 +55,9 @@ export const RegisterService = async (
 
     for (const skillName of offeredSkills) {
       const skill = await tx.skill.upsert({
-        where: { skill_name: skillName },
+        where: { name: skillName },
         update: {},
-        create: { skill_name: skillName },
+        create: { name: skillName, category: "GENERAL" },
       });
 
       await tx.userSkill.upsert({
@@ -79,9 +79,9 @@ export const RegisterService = async (
 
     for (const skillName of requiredSkills) {
       const skill = await tx.skill.upsert({
-        where: { skill_name: skillName },
+        where: { name: skillName },
         update: {},
-        create: { skill_name: skillName },
+        create: { name: skillName, category: "GENERAL" },
       });
 
       await tx.userSkill.upsert({

@@ -21,6 +21,7 @@ import {
   internalRecommenderRouter,
 } from "./modules/recommender/recommender.routes.js";
 import reviewRoutes from "./modules/reviews/review.routes.js";
+import skillRoutes from "./modules/skills/skills.routes.js";
 import userRoutes from "./modules/users/users.routes.js";
 // import "./types/express.js";
 
@@ -87,6 +88,7 @@ app.use("/messages", messageRoutes);
 app.use("/notifications", notificationRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/skills", skillRoutes);
 app.use("/feed", feedRouter);
 app.use("/internal", internalRecommenderRouter);
 

@@ -14,7 +14,7 @@ const skillInclude = {
   skills: {
     select: {
       skill_type: true,
-      skill: { select: { skill_name: true } },
+      skill: { select: { name: true } },
     },
   },
 } as const;

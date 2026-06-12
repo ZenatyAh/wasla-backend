@@ -44,8 +44,10 @@ model User {
 }
 
 model Skill {
-  id         Int         @id @default(autoincrement())
-  skill_name String      @unique
+  id         Int           @id @default(autoincrement())
+  name       String        @unique @map("skill_name")
+  category   SkillCategory @default(GENERAL)
+  isApproved Boolean       @default(true) @map("is_approved")
   users      UserSkill[]
 
   @@map("skills")
@@ -143,6 +145,11 @@ model PasswordResetToken {
 enum skill_type {
   OFFER
   REQUEST
+}
+
+enum SkillCategory {
+  TECHNICAL
+  GENERAL
 }
 
 enum PostCategory {
