@@ -3,6 +3,11 @@ import { z } from "zod";
 import { getErrorMessage, sendError } from "../../common/utils/httpError.js";
 import { prisma } from "../../lib/prisma.js";
 import {
+  postSelect,
+  toPostResponse,
+  type PostRecord,
+} from "../posts/posts.mapper.js";
+import {
   fetchRecommendedPostIds,
   RecommenderUnavailableError,
 } from "./recommender.client.js";
@@ -35,12 +40,31 @@ export const recommenderExportController = async (
  */
 const FEED_LIMIT = 20;
 
-const chronologicalFeed = () =>
-  prisma.post.findMany({
+const mapFeedPosts = (posts: PostRecord[]) => posts.map(toPostResponse);
+
+const chronologicalFeed = async () => {
+  const posts = await prisma.post.findMany({
     where: { status: "PUBLISHED" },
     orderBy: { created_at: "desc" },
     take: FEED_LIMIT,
+    select: postSelect,
   });
+  return mapFeedPosts(posts as PostRecord[]);
+};
+
+const hydrateFeedPosts = async (order: number[]) => {
+  const posts = await prisma.post.findMany({
+    where: { id: { in: order }, status: "PUBLISHED" },
+    select: postSelect,
+  });
+  const byId = new Map(
+    (posts as PostRecord[]).map((post) => [post.id, post]),
+  );
+  const ordered = order
+    .map((id) => byId.get(id))
+    .filter((post): post is PostRecord => Boolean(post));
+  return mapFeedPosts(ordered);
+};
 
 export const feedController = async (req: Request, res: Response) => {
   let userId: number;
@@ -57,15 +81,10 @@ export const feedController = async (req: Request, res: Response) => {
       return res.json({ posts: await chronologicalFeed(), source: "fallback" });
     }
 
-    const posts = await prisma.post.findMany({
-      where: { id: { in: order }, status: "PUBLISHED" },
+    return res.json({
+      posts: await hydrateFeedPosts(order),
+      source: "recommender",
     });
-    const byId = new Map(posts.map((post) => [post.id, post]));
-    const ordered = order
-      .map((id) => byId.get(id))
-      .filter((post): post is (typeof posts)[number] => Boolean(post));
-
-    return res.json({ posts: ordered, source: "recommender" });
   } catch (err: unknown) {
     if (err instanceof RecommenderUnavailableError) {
       return res.json({ posts: await chronologicalFeed(), source: "fallback" });

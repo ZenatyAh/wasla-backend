@@ -188,6 +188,12 @@ if (!hasTestDatabase) {
       assert.notEqual(deletedUser?.username, userUsername);
       assert.equal(deletedUser?.full_name, "Deleted User");
       assert.equal(deletedUser?.available_balance, 0);
+
+      const reviewsResponse = await request(app)
+        .get(`/api/users/${userId}/reviews`)
+        .set(authHeader(signAccessToken(String(counterpartyId))));
+
+      assert.equal(reviewsResponse.status, 404);
     });
 
     it("returns 400 when service is called on already deleted account", async () => {
