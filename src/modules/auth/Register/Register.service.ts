@@ -14,6 +14,7 @@ export const RegisterService = async (
     full_name,
     bio,
     profile_image,
+    location,
     offeredSkills,
     requiredSkills,
   } = data;
@@ -48,6 +49,7 @@ export const RegisterService = async (
         password_hash: hashPassword,
         bio: bio ?? null,
         profile_image: profile_image ?? null,
+        location: location ?? null,
       },
     });
 

@@ -17,6 +17,7 @@ export const getUserProfile = async (userId: number) => {
           bio: true,
           profile_image: true,
           available_balance: true,
+          deleted_at: true,
         },
       }),
       prisma.serviceExchange.count({
@@ -59,7 +60,7 @@ export const getUserProfile = async (userId: number) => {
       }),
     ]);
 
-  if (!user) {
+  if (!user || user.deleted_at) {
     throw new ChatError("User not found", 404);
   }
 

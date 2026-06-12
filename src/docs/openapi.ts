@@ -199,7 +199,7 @@ export const openApiSpec = {
               "Set-Cookie": {
                 schema: { type: "string" },
                 example:
-                  "refreshToken=eyJhbGciOiJIUzI1NiIs...; HttpOnly; SameSite=Strict",
+                  "refreshToken=eyJhbGciOiJIUzI1NiIs...; HttpOnly; SameSite=None; Secure",
               },
             },
             content: {
@@ -250,7 +250,7 @@ export const openApiSpec = {
               "Set-Cookie": {
                 schema: { type: "string" },
                 example:
-                  "refreshToken=eyJhbGciOiJIUzI1NiIs...; HttpOnly; SameSite=Strict",
+                  "refreshToken=eyJhbGciOiJIUzI1NiIs...; HttpOnly; SameSite=None; Secure",
               },
             },
             content: {
@@ -263,7 +263,7 @@ export const openApiSpec = {
                   user: {
                     id: 1,
                     email: "eng.ahmedzenaty@gmail.com",
-                    Username: "ahmed_zenaty_test",
+                    username: "ahmed_zenaty_test",
                   },
                 },
               },
@@ -381,7 +381,7 @@ export const openApiSpec = {
               "Set-Cookie": {
                 schema: { type: "string" },
                 example:
-                  "refreshToken=eyJhbGciOiJIUzI1NiIs...; HttpOnly; SameSite=Strict",
+                  "refreshToken=eyJhbGciOiJIUzI1NiIs...; HttpOnly; SameSite=None; Secure",
               },
             },
             content: {
@@ -981,6 +981,67 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/users/account": {
+      delete: {
+        tags: ["Profile"],
+        summary: "Delete current user account",
+        description:
+          "Soft-deletes the authenticated account after password confirmation. Anonymizes PII, invalidates all sessions, and clears the refresh token cookie. Blocked when credits are held in escrow or active service exchanges exist.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DeleteAccountRequest" },
+              example: {
+                password: "OldPass@123",
+              },
+            },
+          },
+        },
+        responses: {
+          "204": {
+            description: "Account deleted. Refresh token cookie cleared.",
+          },
+          "400": {
+            description: "Validation error or account already deleted",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+                example: {
+                  status: "fail",
+                  message: "Account already deleted",
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Unauthorized or invalid password",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+                example: {
+                  status: "fail",
+                  message: "Invalid password",
+                },
+              },
+            },
+          },
+          "409": {
+            description: "Active exchanges or escrow balance",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+                example: {
+                  status: "fail",
+                  message: "Cannot delete account with active service exchanges",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     "/api/users/profile": {
       put: {
         tags: ["Profile"],
@@ -1534,7 +1595,7 @@ export const openApiSpec = {
           full_name: {
             type: "string",
             minLength: 3,
-            maxLength: 40,
+            maxLength: 100,
             example: "Ahmed Zenaty",
           },
           username: {
@@ -1572,7 +1633,7 @@ export const openApiSpec = {
           },
           offeredSkills: {
             type: "array",
-            minItems: 5,
+            minItems: 1,
             maxItems: 10,
             uniqueItems: true,
             items: {
@@ -1583,7 +1644,7 @@ export const openApiSpec = {
           },
           requiredSkills: {
             type: "array",
-            minItems: 5,
+            minItems: 1,
             maxItems: 10,
             uniqueItems: true,
             items: {
@@ -1846,6 +1907,17 @@ export const openApiSpec = {
           body: { type: "string" },
           isRead: { type: "boolean" },
           createdAt: { type: "string", format: "date-time" },
+        },
+      },
+      DeleteAccountRequest: {
+        type: "object",
+        required: ["password"],
+        properties: {
+          password: {
+            type: "string",
+            minLength: 1,
+            example: "OldPass@123",
+          },
         },
       },
       UpdateProfileRequest: {
