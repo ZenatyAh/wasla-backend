@@ -6,12 +6,19 @@ import {
   getProfileController,
   updateProfileController,
 } from "./profile.controller.js";
+import { deleteAccountController } from "./deleteAccount.controller.js";
+import { deleteAccountSchema } from "./deleteAccount.schema.js";
 import { updateProfileSchema } from "./profile.schema.js";
 
 const router = Router();
 
 router.use(authMiddleware);
 
+router.delete(
+  "/account",
+  validate(deleteAccountSchema),
+  deleteAccountController,
+);
 router.put(
   "/profile",
   validate(updateProfileSchema),

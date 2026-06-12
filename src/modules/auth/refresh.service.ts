@@ -1,17 +1,20 @@
-import { JWT_SECRET } from "../../common/utils/env.js";
-import jwt from "jsonwebtoken";
-import { signAccessToken, RefreshAccessToken } from "../../common/utils/jwt.js";
+import {
+  signAccessToken,
+  RefreshAccessToken,
+  verifyRefreshToken,
+} from "../../common/utils/jwt.js";
 import { prisma } from "../../lib/prisma.js";
+
 export const refreshService = async (refreshToken?: string) => {
   // 1 - check if refreshToken found
   if (!refreshToken) {
     throw new Error(`No refresh token`);
   }
 
-  // 2 - verify JWT
-  let payload: any;
+  // 2 - verify JWT (refresh type only)
+  let payload;
   try {
-    payload = jwt.verify(refreshToken, JWT_SECRET);
+    payload = verifyRefreshToken(refreshToken);
   } catch {
     throw new Error(`Invalid or expired refresh token`);
   }

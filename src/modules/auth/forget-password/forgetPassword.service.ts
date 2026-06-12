@@ -7,7 +7,7 @@ export const forgetPasswordService = async (email: string) => {
       email,
     },
   });
-  if (!user) {
+  if (!user || user.deleted_at) {
     return;
   }
 

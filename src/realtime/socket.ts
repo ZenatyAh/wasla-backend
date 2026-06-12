@@ -1,7 +1,6 @@
 import type { Server as HttpServer } from "http";
-import jwt from "jsonwebtoken";
 import { Server } from "socket.io";
-import { JWT_SECRET } from "../common/utils/env.js";
+import { verifyAccessToken } from "../common/utils/jwt.js";
 import { prisma } from "../lib/prisma.js";
 
 let io: Server | null = null;
@@ -24,7 +23,7 @@ export const initSocket = (server: HttpServer) => {
         return next(new Error("Unauthorized"));
       }
 
-      const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
+      const payload = verifyAccessToken(token);
       socket.data.userId = Number(payload.userId);
       next();
     } catch {

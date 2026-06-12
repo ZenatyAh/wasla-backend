@@ -13,7 +13,7 @@ export const loginService = async (data: any, meta: any) => {
     where: { email },
   });
 
-  if (!user) {
+  if (!user || user.deleted_at) {
     throw new Error(`Invalid credentials`);
   }
 
@@ -34,7 +34,7 @@ export const loginService = async (data: any, meta: any) => {
     user: {
       id: user.id,
       email: user.email,
-      Username: user.username,
+      username: user.username,
     },
   };
 };

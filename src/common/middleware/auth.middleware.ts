@@ -1,7 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
-import { JWT_SECRET } from "../utils/env.js";
-export const authMiddleware = (
+import { prisma } from "../../lib/prisma.js";
+import { verifyAccessToken } from "../utils/jwt.js";
+
+export const authMiddleware = async (
   req: Request,
   res: Response,
   next: NextFunction,
@@ -19,8 +20,23 @@ export const authMiddleware = (
     if (!token) {
       return res.status(401).json({ message: "Invalid or expired token" });
     }
-    const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
-    (req as Request & { user?: unknown }).user = payload;
+
+    const payload = verifyAccessToken(token);
+    const userId = Number(payload.userId);
+    if (!Number.isInteger(userId)) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { deleted_at: true },
+    });
+
+    if (!user || user.deleted_at) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+
+    req.user = { userId: payload.userId };
     return next();
   } catch {
     return res.status(401).json({ message: "Invalid or expired token" });

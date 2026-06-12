@@ -24,6 +24,7 @@ model User {
   updated_at            DateTime             @updatedAt
   is_verified           Boolean              @default(false)
   location              String?
+  deleted_at            DateTime?
   passwordResetTokens   PasswordResetToken[]
   posts                 Post[]
   savedPosts            SavedPost[]
