@@ -61,4 +61,10 @@ describe("OpenAPI spec", () => {
     assert.ok("/feed/{userId}" in openApiSpec.paths);
     assert.ok("/internal/recommender-export" in openApiSpec.paths);
   });
+
+  it("documents skills routes", () => {
+    assert.ok("/api/skills" in openApiSpec.paths);
+    assert.ok("get" in openApiSpec.paths["/api/skills"]);
+    assert.ok("post" in openApiSpec.paths["/api/skills"]);
+  });
 });
