@@ -25,29 +25,11 @@ import skillRoutes from "./modules/skills/skills.routes.js";
 import userRoutes from "./modules/users/users.routes.js";
 // import "./types/express.js";
 
-const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
-
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  "https://wasla-five.vercel.app",
-  "http://localhost:3000",
-  "http://localhost:5173",
-  "http://127.0.0.1:3000",
-  "http://127.0.0.1:5173",
-]
-  .filter((origin): origin is string => Boolean(origin))
-  .map(normalizeOrigin);
-
 app.use(
   cors({
-    origin(origin, callback) {
-      // Allow non-browser clients (no Origin header) and allowlisted frontends.
-      if (!origin || allowedOrigins.includes(normalizeOrigin(origin))) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error(`Origin ${origin} is not allowed by CORS`));
-    },
+    // TEMPORARY: reflect any Origin so frontend integration is not blocked by CORS.
+    // Re-enable an allowlist before production hardening.
+    origin: true,
     credentials: true,
   }),
 );
