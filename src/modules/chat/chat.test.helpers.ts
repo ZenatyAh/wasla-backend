@@ -47,3 +47,21 @@ export const waitForSocketEvent = <T>(
       resolve(payload);
     });
   });
+
+export const waitForCondition = async <T>(
+  check: () => Promise<T | null | undefined | false>,
+  timeoutMs = 3000,
+  intervalMs = 50,
+): Promise<T> => {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const result = await check();
+    if (result) {
+      return result;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error("Timed out waiting for condition");
+};

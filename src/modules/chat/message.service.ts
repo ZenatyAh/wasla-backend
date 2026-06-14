@@ -1,3 +1,4 @@
+import { fireAndForget } from "../../common/utils/fireAndForget.js";
 import { prisma } from "../../lib/prisma.js";
 import { createMessageNotification } from "../notifications/notification.service.js";
 import { emitToConversation } from "../../realtime/socket.js";
@@ -8,6 +9,60 @@ import {
   toMessageResponse,
 } from "./chat.mapper.js";
 import type { EditMessageInput, ListMessagesQuery, SendMessageInput } from "./chat.schema.js";
+
+const processMessageSideEffects = (params: {
+  callerId: number;
+  conversationId: string;
+  messageId: string;
+  senderName: string;
+  preview: string;
+  response: ReturnType<typeof toMessageResponse>;
+}) => {
+  const {
+    callerId,
+    conversationId,
+    messageId,
+    senderName,
+    preview,
+    response,
+  } = params;
+
+  fireAndForget("chat:message-side-effects", async () => {
+    emitToConversation(conversationId, "chat:message:new", response);
+
+    const recipient = await prisma.conversationParticipant.findFirst({
+      where: {
+        conversationId,
+        userId: { not: callerId },
+      },
+      include: {
+        user: { select: { id: true, email: true, full_name: true } },
+      },
+    });
+
+    if (!recipient) {
+      return;
+    }
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { postId: true },
+    });
+
+    const notification = await createMessageNotification({
+      recipientId: recipient.userId,
+      recipientEmail: recipient.user.email,
+      recipientName: recipient.user.full_name,
+      senderName,
+      conversationId,
+      messageId,
+      postId: conversation?.postId,
+      preview,
+    });
+
+    emitToConversation(conversationId, "chat:notification:new", notification);
+  });
+};
 
 const buildMessageCursorFilter = async (cursor?: string) => {
   if (!cursor) {
@@ -92,41 +147,14 @@ export const sendMessage = async (
 
   const response = toMessageResponse(message);
 
-  const recipient = await prisma.conversationParticipant.findFirst({
-    where: {
-      conversationId,
-      userId: { not: callerId },
-    },
-    include: {
-      user: { select: { id: true, email: true, full_name: true } },
-    },
+  processMessageSideEffects({
+    callerId,
+    conversationId,
+    messageId: message.id,
+    senderName: message.sender.username,
+    preview: input.body,
+    response,
   });
-
-  if (recipient) {
-    try {
-      const notification = await createMessageNotification({
-        recipientId: recipient.userId,
-        recipientEmail: recipient.user.email,
-        recipientName: recipient.user.full_name,
-        senderName: message.sender.username,
-        conversationId,
-        messageId: message.id,
-        postId: (
-          await prisma.conversation.findUnique({
-            where: { id: conversationId },
-            select: { postId: true },
-          })
-        )?.postId,
-        preview: input.body,
-      });
-
-      emitToConversation(conversationId, "chat:notification:new", notification);
-    } catch {
-      // Notification/email failures must not block message delivery.
-    }
-  }
-
-  emitToConversation(conversationId, "chat:message:new", response);
 
   return response;
 };
