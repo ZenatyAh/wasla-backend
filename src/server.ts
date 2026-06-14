@@ -5,6 +5,7 @@ import {
   invalidJsonBodyHandler,
   jsonBodyMiddleware,
 } from "./common/middleware/jsonBody.middleware.js";
+import { chatFrontendHtml } from "./docs/chatFrontendHtml.js";
 import { openApiSpec } from "./docs/openapi.js";
 import { swaggerHtml } from "./docs/swaggerHtml.js";
 const app = express();
@@ -53,6 +54,10 @@ app.get("/docs/openapi.json", (_req, res) => {
 
 app.get("/docs", (_req, res) => {
   res.type("html").send(swaggerHtml);
+});
+
+app.get("/docs/chat-frontend", (_req, res) => {
+  res.type("html").send(chatFrontendHtml);
 });
 
 app.get("/me", authMiddleware, (req, res) => {
