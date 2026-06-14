@@ -67,4 +67,23 @@ describe("OpenAPI spec", () => {
     assert.ok("get" in openApiSpec.paths["/skills"]);
     assert.ok("post" in openApiSpec.paths["/skills"]);
   });
+
+  it("documents chat idempotency and socket payload schemas", () => {
+    const sendPath = openApiSpec.paths["/conversations/{conversationId}/messages"];
+    assert.ok("post" in sendPath);
+    assert.ok("200" in sendPath.post.responses);
+    assert.ok("409" in sendPath.post.responses);
+
+    const schemas = openApiSpec.components.schemas;
+    assert.ok("MessageStatus" in schemas);
+    assert.ok("ChatMessagesDeliveredPayload" in schemas);
+    assert.ok("ChatMessagesReadPayload" in schemas);
+    assert.ok("ChatMessagesStatusEvent" in schemas);
+    assert.ok("ChatPresenceOnlineEvent" in schemas);
+    assert.ok("ChatPresenceOfflineEvent" in schemas);
+
+    const sendSchema = schemas.SendMessageRequest;
+    assert.ok(Array.isArray(sendSchema.required));
+    assert.ok(sendSchema.required.includes("clientMessageId"));
+  });
 });

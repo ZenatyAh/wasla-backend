@@ -97,9 +97,11 @@ export const sendMessageController = async (req: Request, res: Response) => {
 
     const { conversationId } = conversationIdParamSchema.parse(req.params);
     const data = sendMessageSchema.parse(req.body);
-    const message = await sendMessage(userId, conversationId, data);
+    const result = await sendMessage(userId, conversationId, data);
 
-    return res.status(201).json({ message });
+    return res.status(result.isDuplicate ? 200 : 201).json({
+      message: result.message,
+    });
   } catch (err: unknown) {
     return handleChatControllerError(res, err, "Send message failed");
   }

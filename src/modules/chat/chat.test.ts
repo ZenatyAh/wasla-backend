@@ -1,5 +1,6 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 
 const hasTestDatabase =
@@ -167,10 +168,11 @@ if (!hasTestDatabase) {
       const response = await request(app)
         .post(`/conversations/${conversationId}/messages`)
         .set(authHeader(visitorToken))
-        .send({ body: "مرحباً، هل الخدمة متاحة؟" });
+        .send({ body: "مرحباً، هل الخدمة متاحة؟", clientMessageId: randomUUID() });
 
       assert.equal(response.status, 201);
       assert.equal(response.body.message.body, "مرحباً، هل الخدمة متاحة؟");
+      assert.equal(response.body.message.status, "SENT");
       assert.equal(response.body.message.sender?.email, undefined);
       assert.ok(response.body.message.sender?.username);
       messageId = response.body.message.id;
@@ -180,7 +182,7 @@ if (!hasTestDatabase) {
       const response = await request(app)
         .post(`/conversations/${conversationId}/messages`)
         .set(authHeader(visitorToken))
-        .send({ body: "   " });
+        .send({ body: "   ", clientMessageId: randomUUID() });
 
       assert.equal(response.status, 400);
     });
@@ -217,7 +219,7 @@ if (!hasTestDatabase) {
       const response = await request(app)
         .post(`/conversations/${conversationId}/messages`)
         .set(authHeader(ownerToken))
-        .send({ body: "أهلاً، نعم الخدمة متاحة يوم الخميس." });
+        .send({ body: "أهلاً، نعم الخدمة متاحة يوم الخميس.", clientMessageId: randomUUID() });
 
       assert.equal(response.status, 201);
       assert.equal(response.body.message.senderId, ownerId);
@@ -247,7 +249,7 @@ if (!hasTestDatabase) {
       const visitorFollowUp = await request(app)
         .post(`/conversations/${conversationId}/messages`)
         .set(authHeader(visitorToken))
-        .send({ body: "ممتاز، الساعة 4 مناسبة؟" });
+        .send({ body: "ممتاز، الساعة 4 مناسبة؟", clientMessageId: randomUUID() });
 
       assert.equal(visitorFollowUp.status, 201);
       assert.equal(visitorFollowUp.body.message.senderId, visitorId);
@@ -255,7 +257,7 @@ if (!hasTestDatabase) {
       const ownerFollowUp = await request(app)
         .post(`/conversations/${conversationId}/messages`)
         .set(authHeader(ownerToken))
-        .send({ body: "نعم، الساعة 4 مناسبة جداً." });
+        .send({ body: "نعم، الساعة 4 مناسبة جداً.", clientMessageId: randomUUID() });
 
       assert.equal(ownerFollowUp.status, 201);
       assert.equal(ownerFollowUp.body.message.senderId, ownerId);
@@ -329,7 +331,7 @@ if (!hasTestDatabase) {
       const sendResponse = await request(app)
         .post(`/conversations/${conversationId}/messages`)
         .set(authHeader(visitorToken))
-        .send({ body: "رسالة جديدة للإشعار" });
+        .send({ body: "رسالة جديدة للإشعار", clientMessageId: randomUUID() });
 
       assert.equal(sendResponse.status, 201);
 
