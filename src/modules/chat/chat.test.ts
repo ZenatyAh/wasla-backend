@@ -13,6 +13,7 @@ if (!hasTestDatabase) {
   });
 } else {
   const bcrypt = (await import("bcrypt")).default;
+  const { waitForCondition } = await import("./chat.test.helpers.js");
   const request = (await import("supertest")).default;
   const { signAccessToken } = await import("../../common/utils/jwt.js");
   const { prisma } = await import("../../lib/prisma.js");
@@ -332,9 +333,20 @@ if (!hasTestDatabase) {
 
       assert.equal(sendResponse.status, 201);
 
-      const notifications = await request(app)
-        .get("/notifications")
-        .set(authHeader(ownerToken));
+      const notifications = await waitForCondition(async () => {
+        const response = await request(app)
+          .get("/notifications")
+          .set(authHeader(ownerToken));
+
+        if (
+          response.status === 200 &&
+          response.body.notifications.length >= 1
+        ) {
+          return response;
+        }
+
+        return null;
+      });
 
       assert.equal(notifications.status, 200);
       assert.ok(notifications.body.notifications.length >= 1);
