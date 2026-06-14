@@ -1,5 +1,6 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { io as ioClient, type Socket } from "socket.io-client";
 import {
@@ -23,6 +24,9 @@ if (!hasTestDatabase) {
   const { prisma } = await import("../../lib/prisma.js");
   const { default: app } = await import("../../server.js");
   const { initSocket } = await import("../../realtime/socket.js");
+  const { STATUS_BATCH_DEBOUNCE_MS } = await import(
+    "../../realtime/message-status.batch.js"
+  );
 
   const runId = `${Date.now()}_socket`;
   const password = "TestPass@123";
@@ -164,7 +168,7 @@ if (!hasTestDatabase) {
       const sendResponse = await request(app)
         .post(`/conversations/${conversationId}/messages`)
         .set(authHeader(visitorToken))
-        .send({ body: "رسالة فورية من الزائر" });
+        .send({ body: "رسالة فورية من الزائر", clientMessageId: randomUUID() });
 
       assert.equal(sendResponse.status, 201);
 
@@ -183,7 +187,7 @@ if (!hasTestDatabase) {
       const sendResponse = await request(app)
         .post(`/conversations/${conversationId}/messages`)
         .set(authHeader(ownerToken))
-        .send({ body: "رد فوري من صاحب المنشور" });
+        .send({ body: "رد فوري من صاحب المنشور", clientMessageId: randomUUID() });
 
       assert.equal(sendResponse.status, 201);
 
@@ -197,7 +201,7 @@ if (!hasTestDatabase) {
       const sendResponse = await request(app)
         .post(`/conversations/${conversationId}/messages`)
         .set(authHeader(visitorToken))
-        .send({ body: "رسالة للتحقق من read receipt" });
+        .send({ body: "رسالة للتحقق من read receipt", clientMessageId: randomUUID() });
 
       assert.equal(sendResponse.status, 201);
 
@@ -217,6 +221,79 @@ if (!hasTestDatabase) {
 
       assert.equal(payload.userId, ownerId);
       assert.equal(payload.messageId, messageId);
+    });
+
+    it("batch-delivers message status updates via socket", async () => {
+      const sendResponse = await request(app)
+        .post(`/conversations/${conversationId}/messages`)
+        .set(authHeader(visitorToken))
+        .send({
+          body: "رسالة للتحقق من delivered status",
+          clientMessageId: randomUUID(),
+        });
+
+      assert.equal(sendResponse.status, 201);
+
+      const messageId = sendResponse.body.message.id;
+      const statusPromise = waitForSocketEvent<{
+        conversationId: string;
+        updates: Array<{ messageId: string; status: string }>;
+      }>(visitorSocket!, "chat:messages:status");
+
+      ownerSocket!.emit("chat:messages:delivered", {
+        conversationId,
+        messageIds: [messageId],
+      });
+
+      const payload = await statusPromise;
+
+      assert.equal(payload.conversationId, conversationId);
+      assert.ok(
+        payload.updates.some(
+          (update) =>
+            update.messageId === messageId && update.status === "DELIVERED",
+        ),
+      );
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, STATUS_BATCH_DEBOUNCE_MS + 100),
+      );
+    });
+
+    it("batch-read updates message status via socket", async () => {
+      const sendResponse = await request(app)
+        .post(`/conversations/${conversationId}/messages`)
+        .set(authHeader(visitorToken))
+        .send({
+          body: "رسالة للتحقق من read status",
+          clientMessageId: randomUUID(),
+        });
+
+      assert.equal(sendResponse.status, 201);
+
+      const messageId = sendResponse.body.message.id;
+      const statusPromise = waitForSocketEvent<{
+        conversationId: string;
+        updates: Array<{ messageId: string; status: string }>;
+      }>(visitorSocket!, "chat:messages:status");
+
+      ownerSocket!.emit("chat:messages:read", {
+        conversationId,
+        messageIds: [messageId],
+      });
+
+      const payload = await statusPromise;
+
+      assert.ok(
+        payload.updates.some(
+          (update) =>
+            update.messageId === messageId && update.status === "READ",
+        ),
+      );
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, STATUS_BATCH_DEBOUNCE_MS + 100),
+      );
     });
   });
 }

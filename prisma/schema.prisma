@@ -23,6 +23,8 @@ model User {
   created_at            DateTime             @default(now())
   updated_at            DateTime             @updatedAt
   is_verified           Boolean              @default(false)
+  is_online             Boolean              @default(false)
+  last_seen             DateTime?
   location              String?
   deleted_at            DateTime?
   passwordResetTokens   PasswordResetToken[]
@@ -179,6 +181,12 @@ enum NotificationType {
   CONVERSATION_STARTED
 }
 
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
 enum ServiceExchangeStatus {
   PENDING
   ACCEPTED
@@ -225,10 +233,14 @@ model ConversationParticipant{
 
 model Message {
   id String @id @default(cuid())
+  clientMessageId String? @unique
   senderId Int
   conversationId String
   body  String
+  status MessageStatus @default(SENT)
   createdAt DateTime @default(now())
+  deliveredAt DateTime?
+  readAt DateTime?
   editedAt DateTime?
   deletedAt DateTime?
 

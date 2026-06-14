@@ -33,7 +33,18 @@ export const openApiSpec = {
     {
       name: "Chat",
       description:
-        "1:1 post-linked conversations and messages. Real-time updates via Socket.IO: connect with access JWT in auth.token. Client events: chat:join, chat:leave. Server events: chat:message:new, chat:message:edited, chat:message:deleted, chat:message:read, chat:notification:new, chat:error.",
+        "1:1 post-linked conversations and messages. REST is the source of truth; Socket.IO delivers live updates.\n\n" +
+        "**Message lifecycle:** `SENT` (on HTTP 201) → `DELIVERED` (recipient ack) → `READ` (recipient viewport ack). " +
+        "Status transitions are batched server-side (500ms debounce).\n\n" +
+        "**Idempotent sends:** `POST /conversations/{conversationId}/messages` requires `clientMessageId` (UUID). " +
+        "Retrying the same UUID returns HTTP 200 with the existing message (no duplicate row).\n\n" +
+        "**Socket.IO connection:** pass access JWT in `auth.token`. Engine heartbeat: ping every 10s, disconnect if no pong within 5s. " +
+        "Personal room `user:{userId}` is auto-joined; join `conversation:{conversationId}` via `chat:join`.\n\n" +
+        "**Client → server events:** `chat:join`, `chat:leave`, `chat:messages:delivered`, `chat:messages:read` " +
+        "(see `ChatMessagesDeliveredPayload`, `ChatMessagesReadPayload`).\n\n" +
+        "**Server → client events:** `chat:message:new`, `chat:message:sent`, `chat:message:edited`, `chat:message:deleted`, " +
+        "`chat:message:read`, `chat:messages:status`, `chat:presence:online`, `chat:presence:offline`, `chat:notification:new`, `chat:error` " +
+        "(see corresponding `Chat*Event` schemas).",
     },
     {
       name: "Notifications",
@@ -902,6 +913,8 @@ export const openApiSpec = {
       get: {
         tags: ["Chat"],
         summary: "Get conversation details",
+        description:
+          "Returns conversation metadata including participant presence (`is_online`, `last_seen`) and unread count.",
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "conversationId", in: "path", required: true, schema: { type: "string" } },
@@ -947,6 +960,9 @@ export const openApiSpec = {
       post: {
         tags: ["Chat"],
         summary: "Send a message",
+        description:
+          "Persists a message with status `SENT` and returns immediately. Side effects (socket broadcast, notifications, email) run asynchronously. " +
+          "Supply a client-generated `clientMessageId` (UUID) before sending; retries with the same ID return HTTP 200 without creating a duplicate.",
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "conversationId", in: "path", required: true, schema: { type: "string" } },
@@ -956,13 +972,24 @@ export const openApiSpec = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/SendMessageRequest" },
-              example: { body: "مرحباً، هل الخدمة متاحة؟" },
+              example: {
+                body: "مرحباً، هل الخدمة متاحة؟",
+                clientMessageId: "550e8400-e29b-41d4-a716-446655440000",
+              },
             },
           },
         },
         responses: {
           "201": {
-            description: "Message sent",
+            description: "New message created with status SENT",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/MessageResponse" },
+              },
+            },
+          },
+          "200": {
+            description: "Idempotent retry — existing message returned (same clientMessageId)",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/MessageResponse" },
@@ -972,6 +999,9 @@ export const openApiSpec = {
           "400": { $ref: "#/components/responses/BadRequest" },
           "401": { $ref: "#/components/responses/Unauthorized" },
           "403": { $ref: "#/components/responses/Forbidden" },
+          "409": {
+            description: "clientMessageId already used for a different conversation or sender",
+          },
           "429": { $ref: "#/components/responses/TooManyRequests" },
         },
       },
@@ -1026,11 +1056,14 @@ export const openApiSpec = {
       post: {
         tags: ["Chat"],
         summary: "Mark message as read",
+        description:
+          "Records a read receipt and transitions message status to `READ`. Also emits `chat:message:read` and `chat:messages:status` via Socket.IO. " +
+          "For bulk/read-on-viewport flows, prefer emitting `chat:messages:read` over the socket.",
         security: [{ bearerAuth: [] }],
         parameters: [{ name: "messageId", in: "path", required: true, schema: { type: "string" } }],
         responses: {
           "200": {
-            description: "Read receipt recorded",
+            description: "Read receipt recorded and message status updated to READ",
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/ReadReceiptResponse" },
@@ -1039,6 +1072,7 @@ export const openApiSpec = {
           },
           "401": { $ref: "#/components/responses/Unauthorized" },
           "403": { $ref: "#/components/responses/Forbidden" },
+          "404": { description: "Message not found" },
         },
       },
     },
@@ -2161,9 +2195,19 @@ export const openApiSpec = {
       },
       SendMessageRequest: {
         type: "object",
-        required: ["body"],
+        required: ["body", "clientMessageId"],
         properties: {
           body: { type: "string", minLength: 1, maxLength: 2000 },
+          clientMessageId: {
+            type: "string",
+            format: "uuid",
+            description:
+              "Client-generated UUID assigned before the first send attempt. Reuse on retry after network failure to avoid duplicate messages.",
+          },
+        },
+        example: {
+          body: "مرحباً، هل الخدمة متاحة؟",
+          clientMessageId: "550e8400-e29b-41d4-a716-446655440000",
         },
       },
       EditMessageRequest: {
@@ -2177,6 +2221,7 @@ export const openApiSpec = {
         type: "object",
         properties: {
           id: { type: "string" },
+          clientMessageId: { type: "string", format: "uuid", nullable: true },
           conversationId: { type: "string" },
           senderId: { type: "integer" },
           sender: {
@@ -2187,7 +2232,10 @@ export const openApiSpec = {
             },
           },
           body: { type: "string", nullable: true },
+          status: { $ref: "#/components/schemas/MessageStatus" },
           createdAt: { type: "string", format: "date-time" },
+          deliveredAt: { type: "string", format: "date-time", nullable: true },
+          readAt: { type: "string", format: "date-time", nullable: true },
           editedAt: { type: "string", format: "date-time", nullable: true },
           deletedAt: { type: "string", format: "date-time", nullable: true },
           readBy: {
@@ -2227,6 +2275,106 @@ export const openApiSpec = {
           readReceipt: { $ref: "#/components/schemas/ReadReceipt" },
         },
       },
+      MessageStatus: {
+        type: "string",
+        enum: ["SENT", "DELIVERED", "READ"],
+        description:
+          "SENT: persisted by server. DELIVERED: recipient received payload. READ: recipient viewed message in UI.",
+      },
+      ChatSocketJoinPayload: {
+        type: "object",
+        required: ["conversationId"],
+        properties: {
+          conversationId: { type: "string" },
+        },
+        description: "Socket.IO client event `chat:join` — join room conversation:{conversationId}.",
+      },
+      ChatSocketLeavePayload: {
+        type: "object",
+        required: ["conversationId"],
+        properties: {
+          conversationId: { type: "string" },
+        },
+        description: "Socket.IO client event `chat:leave`.",
+      },
+      ChatMessagesDeliveredPayload: {
+        type: "object",
+        required: ["conversationId", "messageIds"],
+        properties: {
+          conversationId: { type: "string" },
+          messageIds: {
+            type: "array",
+            items: { type: "string" },
+            minItems: 1,
+            maxItems: 100,
+          },
+        },
+        description:
+          "Socket.IO client event `chat:messages:delivered` — emit after receiving message payload to advance status to DELIVERED.",
+      },
+      ChatMessagesReadPayload: {
+        type: "object",
+        required: ["conversationId", "messageIds"],
+        properties: {
+          conversationId: { type: "string" },
+          messageIds: {
+            type: "array",
+            items: { type: "string" },
+            minItems: 1,
+            maxItems: 100,
+          },
+        },
+        description:
+          "Socket.IO client event `chat:messages:read` — emit when messages enter the recipient viewport (e.g. IntersectionObserver).",
+      },
+      MessageStatusUpdateItem: {
+        type: "object",
+        properties: {
+          messageId: { type: "string" },
+          status: { $ref: "#/components/schemas/MessageStatus" },
+          deliveredAt: { type: "string", format: "date-time", nullable: true },
+          readAt: { type: "string", format: "date-time", nullable: true },
+        },
+      },
+      ChatMessagesStatusEvent: {
+        type: "object",
+        properties: {
+          conversationId: { type: "string" },
+          updates: {
+            type: "array",
+            items: { $ref: "#/components/schemas/MessageStatusUpdateItem" },
+          },
+        },
+        description: "Socket.IO server event `chat:messages:status` — batched status transitions.",
+      },
+      ChatPresenceOnlineEvent: {
+        type: "object",
+        properties: {
+          userId: { type: "integer" },
+        },
+        description:
+          "Socket.IO server event `chat:presence:online` — sent to conversation partners when user connects.",
+      },
+      ChatPresenceOfflineEvent: {
+        type: "object",
+        properties: {
+          userId: { type: "integer" },
+          lastSeen: { type: "string", format: "date-time" },
+        },
+        description:
+          "Socket.IO server event `chat:presence:offline` — sent after debounced disconnect (default 7s).",
+      },
+      ChatErrorEvent: {
+        type: "object",
+        properties: {
+          code: {
+            type: "string",
+            enum: ["INVALID_PAYLOAD", "FORBIDDEN", "JOIN_FAILED"],
+          },
+          message: { type: "string" },
+        },
+        description: "Socket.IO server event `chat:error`.",
+      },
       ChatParticipantUser: {
         type: "object",
         properties: {
@@ -2234,6 +2382,8 @@ export const openApiSpec = {
           username: { type: "string" },
           full_name: { type: "string" },
           profile_image: { type: "string", nullable: true },
+          is_online: { type: "boolean" },
+          last_seen: { type: "string", format: "date-time", nullable: true },
         },
       },
       ConversationParticipant: {

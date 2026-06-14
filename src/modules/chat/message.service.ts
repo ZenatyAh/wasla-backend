@@ -1,7 +1,8 @@
 import { fireAndForget } from "../../common/utils/fireAndForget.js";
 import { prisma } from "../../lib/prisma.js";
+import { processReadMessagesSync } from "../../realtime/message-status.batch.js";
+import { emitToConversation, emitToUser } from "../../realtime/socket.js";
 import { createMessageNotification } from "../notifications/notification.service.js";
-import { emitToConversation } from "../../realtime/socket.js";
 import { ChatError } from "./chat.errors.js";
 import { assertConversationParticipant } from "./chat.guard.js";
 import {
@@ -9,6 +10,12 @@ import {
   toMessageResponse,
 } from "./chat.mapper.js";
 import type { EditMessageInput, ListMessagesQuery, SendMessageInput } from "./chat.schema.js";
+
+const isUniqueConstraintError = (err: unknown): boolean =>
+  typeof err === "object" &&
+  err !== null &&
+  "code" in err &&
+  (err as { code: string }).code === "P2002";
 
 const processMessageSideEffects = (params: {
   callerId: number;
@@ -28,6 +35,7 @@ const processMessageSideEffects = (params: {
   } = params;
 
   fireAndForget("chat:message-side-effects", async () => {
+    emitToUser(callerId, "chat:message:sent", response);
     emitToConversation(conversationId, "chat:message:new", response);
 
     const recipient = await prisma.conversationParticipant.findFirst({
@@ -127,36 +135,87 @@ export const sendMessage = async (
 ) => {
   await assertConversationParticipant(conversationId, callerId);
 
-  const message = await prisma.$transaction(async (tx) => {
-    const created = await tx.message.create({
-      data: {
-        conversationId,
-        senderId: callerId,
-        body: input.body,
-      },
+  const existing = await prisma.message.findUnique({
+    where: { clientMessageId: input.clientMessageId },
+    include: messageInclude,
+  });
+
+  if (existing) {
+    if (
+      existing.conversationId !== conversationId ||
+      existing.senderId !== callerId
+    ) {
+      throw new ChatError("clientMessageId already used for another message", 409);
+    }
+
+    return {
+      message: toMessageResponse(existing),
+      isDuplicate: true,
+    };
+  }
+
+  try {
+    const message = await prisma.$transaction(async (tx) => {
+      const created = await tx.message.create({
+        data: {
+          conversationId,
+          senderId: callerId,
+          body: input.body,
+          clientMessageId: input.clientMessageId,
+          status: "SENT",
+        },
+        include: messageInclude,
+      });
+
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() },
+      });
+
+      return created;
+    });
+
+    const response = toMessageResponse(message);
+
+    processMessageSideEffects({
+      callerId,
+      conversationId,
+      messageId: message.id,
+      senderName: message.sender.username,
+      preview: input.body,
+      response,
+    });
+
+    return {
+      message: response,
+      isDuplicate: false,
+    };
+  } catch (err: unknown) {
+    if (!isUniqueConstraintError(err)) {
+      throw err;
+    }
+
+    const raced = await prisma.message.findUnique({
+      where: { clientMessageId: input.clientMessageId },
       include: messageInclude,
     });
 
-    await tx.conversation.update({
-      where: { id: conversationId },
-      data: { updatedAt: new Date() },
-    });
+    if (!raced) {
+      throw err;
+    }
 
-    return created;
-  });
+    if (
+      raced.conversationId !== conversationId ||
+      raced.senderId !== callerId
+    ) {
+      throw new ChatError("clientMessageId already used for another message", 409);
+    }
 
-  const response = toMessageResponse(message);
-
-  processMessageSideEffects({
-    callerId,
-    conversationId,
-    messageId: message.id,
-    senderName: message.sender.username,
-    preview: input.body,
-    response,
-  });
-
-  return response;
+    return {
+      message: toMessageResponse(raced),
+      isDuplicate: true,
+    };
+  }
 };
 
 export const editMessage = async (
@@ -254,19 +313,20 @@ export const markMessageAsRead = async (callerId: number, messageId: string) => 
     throw new ChatError("You cannot mark your own message as read", 403);
   }
 
-  const readReceipt = await prisma.messageReadReceipt.upsert({
+  await processReadMessagesSync(callerId, message.conversationId, [messageId]);
+
+  const readReceipt = await prisma.messageReadReceipt.findUnique({
     where: {
       messageId_userId: {
         messageId,
         userId: callerId,
       },
     },
-    update: {},
-    create: {
-      messageId,
-      userId: callerId,
-    },
   });
+
+  if (!readReceipt) {
+    throw new ChatError("Failed to mark message as read", 500);
+  }
 
   emitToConversation(message.conversationId, "chat:message:read", readReceipt);
 

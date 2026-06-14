@@ -5,25 +5,26 @@ export const assertConversationParticipant = async (
   conversationId: string,
   userId: number,
 ) => {
-  const conversation = await prisma.conversation.findUnique({
-    where: { id: conversationId },
-    select: { id: true },
-  });
-
-  if (!conversation) {
-    throw new ChatError("Conversation not found", 404);
-  }
-
-  const participant = await prisma.conversationParticipant.findUnique({
+  const participant = await prisma.conversationParticipant.findFirst({
     where: {
-      conversationId_userId: {
-        conversationId,
-        userId,
-      },
+      conversationId,
+      userId,
+    },
+    include: {
+      conversation: { select: { id: true } },
     },
   });
 
   if (!participant) {
+    const conversationExists = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: { id: true },
+    });
+
+    if (!conversationExists) {
+      throw new ChatError("Conversation not found", 404);
+    }
+
     throw new ChatError("You do not have access to this resource", 403);
   }
 

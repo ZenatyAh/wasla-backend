@@ -16,6 +16,12 @@ export const conversationIdParamSchema = z.object({
 
 export const sendMessageSchema = z.object({
   body: z.string().trim().min(1).max(2000),
+  clientMessageId: z.string().uuid(),
+});
+
+export const batchMessageStatusSchema = z.object({
+  conversationId: z.string().min(1),
+  messageIds: z.array(z.string().min(1)).min(1).max(100),
 });
 
 export const editMessageSchema = z.object({
@@ -34,5 +40,6 @@ export const messageIdParamSchema = z.object({
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 export type ListConversationsQuery = z.infer<typeof listConversationsQuerySchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+export type BatchMessageStatusInput = z.infer<typeof batchMessageStatusSchema>;
 export type EditMessageInput = z.infer<typeof editMessageSchema>;
 export type ListMessagesQuery = z.infer<typeof listMessagesQuerySchema>;
