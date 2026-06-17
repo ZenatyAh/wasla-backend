@@ -2610,6 +2610,14 @@ export const openApiSpec = {
               username: { type: "string" },
               bio: { type: "string", nullable: true },
               profilePicture: { type: "string", nullable: true },
+              offeredSkills: {
+                type: "array",
+                items: { type: "string" },
+              },
+              requiredSkills: {
+                type: "array",
+                items: { type: "string" },
+              },
               stats: {
                 type: "object",
                 properties: {
