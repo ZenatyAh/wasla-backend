@@ -24,6 +24,7 @@ import {
 import reviewRoutes from "./modules/reviews/review.routes.js";
 import skillRoutes from "./modules/skills/skills.routes.js";
 import userRoutes from "./modules/users/users.routes.js";
+import walletRoutes from "./modules/wallet/wallet.routes.js";
 // import "./types/express.js";
 
 app.use(
@@ -78,6 +79,7 @@ app.use("/reviews", reviewRoutes);
 app.use("/skills", skillRoutes);
 app.use("/feed", feedRouter);
 app.use("/internal", internalRecommenderRouter);
+app.use("/api/v1/wallet", walletRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({

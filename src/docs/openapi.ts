@@ -68,6 +68,10 @@ export const openApiSpec = {
         "Time-credit service exchange (contract) lifecycle with escrow: request, accept, reject, deliver, confirm, cancel, and dispute",
     },
     {
+      name: "Wallet",
+      description: "Authenticated wallet transaction history for the time-credit ledger",
+    },
+    {
       name: "Feed",
       description: "Personalized post feed proxied from the recommender service",
     },
@@ -1768,6 +1772,81 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/v1/wallet/history": {
+      get: {
+        tags: ["Wallet"],
+        summary: "List wallet transaction history",
+        description:
+          "Returns the authenticated user's time-credit transaction history with offset pagination. Includes ledger entries (welcome bonus, transfers, refunds) and virtual pending/cancelled exchange rows derived from escrow state.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "page",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, default: 1 },
+          },
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            schema: { type: "integer", minimum: 1, maximum: 50, default: 10 },
+          },
+          {
+            name: "type",
+            in: "query",
+            required: false,
+            schema: {
+              type: "string",
+              enum: ["earned", "spent", "credit", "debit"],
+            },
+            description:
+              "Filter by direction from the authenticated user's perspective. `earned`/`credit` are incoming credits; `spent`/`debit` are outgoing credits.",
+          },
+          {
+            name: "status",
+            in: "query",
+            required: false,
+            schema: {
+              type: "string",
+              enum: ["completed", "pending", "cancelled"],
+            },
+          },
+          {
+            name: "startDate",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "date" },
+          },
+          {
+            name: "endDate",
+            in: "query",
+            required: false,
+            schema: { type: "string", format: "date" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Paginated wallet history",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/WalletHistoryResponse" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "500": {
+            description: "Internal server error",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
     "/feed/{userId}": {
       get: {
         tags: ["Feed"],
@@ -2721,6 +2800,57 @@ export const openApiSpec = {
               total: { type: "integer", example: 1 },
               totalPages: { type: "integer", example: 1 },
             },
+          },
+        },
+      },
+      WalletCounterparty: {
+        type: "object",
+        properties: {
+          id: { type: "string", example: "12" },
+          name: { type: "string", example: "Ahmed Zenaty" },
+        },
+      },
+      WalletRelatedService: {
+        type: "object",
+        nullable: true,
+        properties: {
+          id: { type: "string", example: "42" },
+          title: { type: "string", example: "Welcome bonus" },
+        },
+      },
+      WalletTransaction: {
+        type: "object",
+        properties: {
+          transactionId: { type: "string", example: "15" },
+          amount: { type: "integer", example: 5 },
+          type: { type: "string", enum: ["credit", "debit"] },
+          counterparty: { $ref: "#/components/schemas/WalletCounterparty" },
+          relatedServiceOrRequest: {
+            $ref: "#/components/schemas/WalletRelatedService",
+          },
+          status: {
+            type: "string",
+            enum: ["completed", "pending", "cancelled"],
+          },
+          timestamp: { type: "string", format: "date-time" },
+        },
+      },
+      WalletHistoryResponse: {
+        type: "object",
+        properties: {
+          success: { type: "boolean", example: true },
+          metadata: {
+            type: "object",
+            properties: {
+              totalItems: { type: "integer", example: 12 },
+              totalPages: { type: "integer", example: 2 },
+              currentPage: { type: "integer", example: 1 },
+              limit: { type: "integer", example: 10 },
+            },
+          },
+          data: {
+            type: "array",
+            items: { $ref: "#/components/schemas/WalletTransaction" },
           },
         },
       },

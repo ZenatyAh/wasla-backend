@@ -100,6 +100,16 @@ export const RegisterService = async (
         },
       });
     }
+
+    await tx.transaction.create({
+      data: {
+        receiver_id: user.id,
+        sender_id: null,
+        amount: 5,
+        transaction_type: "WELCOME_BONUS",
+      },
+    });
+
     return user;
   },{timeout: 15000});
 
