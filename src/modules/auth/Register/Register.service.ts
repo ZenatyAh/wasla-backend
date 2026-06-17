@@ -2,6 +2,7 @@ import { prisma } from "../../../lib/prisma.js";
 import bcrypt from "bcrypt";
 import { createSession } from "./create_session.js";
 import type { RegisterInput } from "../auth.schema.js";
+import { syncUserSkillsByType } from "../../skills/userSkills.service.js";
 
 export const RegisterService = async (
   data: RegisterInput,
@@ -53,53 +54,8 @@ export const RegisterService = async (
       },
     });
 
-    for (const skillName of offeredSkills) {
-      const skill = await tx.skill.upsert({
-        where: { name: skillName },
-        update: {},
-        create: { name: skillName, category: "GENERAL" },
-      });
-
-      await tx.userSkill.upsert({
-        where: {
-          user_id_skill_id_skill_type: {
-            user_id: user.id,
-            skill_id: skill.id,
-            skill_type: "OFFER",
-          },
-        },
-        update: {},
-        create: {
-          user_id: user.id,
-          skill_id: skill.id,
-          skill_type: "OFFER",
-        },
-      });
-    }
-
-    for (const skillName of requiredSkills) {
-      const skill = await tx.skill.upsert({
-        where: { name: skillName },
-        update: {},
-        create: { name: skillName, category: "GENERAL" },
-      });
-
-      await tx.userSkill.upsert({
-        where: {
-          user_id_skill_id_skill_type: {
-            user_id: user.id,
-            skill_id: skill.id,
-            skill_type: "REQUEST",
-          },
-        },
-        update: {},
-        create: {
-          user_id: user.id,
-          skill_id: skill.id,
-          skill_type: "REQUEST",
-        },
-      });
-    }
+    await syncUserSkillsByType(tx, user.id, offeredSkills, "OFFER");
+    await syncUserSkillsByType(tx, user.id, requiredSkills, "REQUEST");
 
     await tx.transaction.create({
       data: {

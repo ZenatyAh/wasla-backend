@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { userSkillsArraySchema } from "../skills/skills.schema.js";
 
 export const emailSchema = z.string().trim().email("Invalid email format");
 export const passwordSchema = z
@@ -9,13 +10,6 @@ export const passwordSchema = z
   .regex(/[a-z]/, "يجب أن تحتوي على حرف صغير واحد على الأقل")
   .regex(/[0-9]/, "يجب أن تحتوي على رقم واحد على الأقل")
   .regex(/[^A-Za-z0-9]/, "يجب أن تحتوي على رمز خاص واحد على الأقل (@#$...)");
-const skillsArray = z
-  .array(z.string().min(2))
-  .min(1)
-  .max(10)
-  .refine((items) => new Set(items).size === items.length, {
-    message: "Array contains duplicate values; each item must be unique",
-  });
 
 export const loginschema = z.object({
   email: emailSchema,
@@ -50,8 +44,8 @@ export const registerSchema = z.object({
   bio: z.string().min(50).max(200).optional().or(z.literal("")), // يقبل اختياري أو نص فارغ
   profile_image: z.string().url().optional(),
   location: z.string().min(3, "choose correct city name").optional(),
-  offeredSkills: skillsArray,
-  requiredSkills: skillsArray,
+  offeredSkills: userSkillsArraySchema,
+  requiredSkills: userSkillsArraySchema,
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

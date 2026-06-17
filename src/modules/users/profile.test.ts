@@ -25,6 +25,7 @@ if (!hasTestDatabase) {
   let consumerId = 0;
   let postId = 0;
   let exchangeId = 0;
+  const createdSkillIds: number[] = [];
 
   let providerToken = "";
   let consumerToken = "";
@@ -62,6 +63,35 @@ if (!hasTestDatabase) {
 
       providerToken = signAccessToken(String(providerId));
       consumerToken = signAccessToken(String(consumerId));
+
+      const initialOfferSkill = await prisma.skill.create({
+        data: {
+          name: `Profile Offer Skill ${runId}`,
+          category: "GENERAL",
+        },
+      });
+      const initialRequestSkill = await prisma.skill.create({
+        data: {
+          name: `Profile Request Skill ${runId}`,
+          category: "GENERAL",
+        },
+      });
+      createdSkillIds.push(initialOfferSkill.id, initialRequestSkill.id);
+
+      await prisma.userSkill.createMany({
+        data: [
+          {
+            user_id: providerId,
+            skill_id: initialOfferSkill.id,
+            skill_type: "OFFER",
+          },
+          {
+            user_id: providerId,
+            skill_id: initialRequestSkill.id,
+            skill_type: "REQUEST",
+          },
+        ],
+      });
 
       const post = await prisma.post.create({
         data: {
@@ -109,6 +139,15 @@ if (!hasTestDatabase) {
       });
       await prisma.post.deleteMany({
         where: { id: postId },
+      });
+      await prisma.skill.deleteMany({
+        where: {
+          OR: [
+            { id: { in: createdSkillIds } },
+            { name: { startsWith: `Profile New Offer Skill ${runId}` } },
+            { name: { startsWith: `Profile Updated Offer Skill ${runId}` } },
+          ],
+        },
       });
       await prisma.user.deleteMany({
         where: { id: { in: [providerId, consumerId] } },
@@ -166,6 +205,72 @@ if (!hasTestDatabase) {
         response.body.profile.profilePicture,
         "https://example.com/avatar.png",
       );
+      assert.deepEqual(response.body.profile.offeredSkills, [
+        `Profile Offer Skill ${runId}`,
+      ]);
+      assert.deepEqual(response.body.profile.requiredSkills, [
+        `Profile Request Skill ${runId}`,
+      ]);
+    });
+
+    it("updates offered skills and keeps required skills unchanged", async () => {
+      const response = await request(app)
+        .put("/users/profile")
+        .set(authHeader(providerToken))
+        .send({
+          offeredSkills: [
+            `Profile Updated Offer Skill ${runId}`,
+            `Profile New Offer Skill ${runId}`,
+          ],
+        });
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(response.body.profile.offeredSkills, [
+        `Profile Updated Offer Skill ${runId}`,
+        `Profile New Offer Skill ${runId}`,
+      ]);
+      assert.deepEqual(response.body.profile.requiredSkills, [
+        `Profile Request Skill ${runId}`,
+      ]);
+
+      const createdSkills = await prisma.skill.findMany({
+        where: {
+          name: {
+            in: [
+              `Profile Updated Offer Skill ${runId}`,
+              `Profile New Offer Skill ${runId}`,
+            ],
+          },
+        },
+        select: { id: true },
+      });
+      createdSkillIds.push(...createdSkills.map((skill) => skill.id));
+    });
+
+    it("replaces required skills when a shorter list is sent", async () => {
+      const response = await request(app)
+        .put("/users/profile")
+        .set(authHeader(providerToken))
+        .send({
+          requiredSkills: [`Profile New Request Skill ${runId}`],
+        });
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(response.body.profile.requiredSkills, [
+        `Profile New Request Skill ${runId}`,
+      ]);
+      assert.deepEqual(response.body.profile.offeredSkills, [
+        `Profile Updated Offer Skill ${runId}`,
+        `Profile New Offer Skill ${runId}`,
+      ]);
+
+      const newRequestSkill = await prisma.skill.findFirst({
+        where: { name: `Profile New Request Skill ${runId}` },
+        select: { id: true },
+      });
+      if (newRequestSkill) {
+        createdSkillIds.push(newRequestSkill.id);
+      }
     });
   });
 }

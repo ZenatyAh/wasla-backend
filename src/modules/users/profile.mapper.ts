@@ -20,11 +20,33 @@ type ProfileUserRecord = {
   available_balance: number;
 };
 
+type UserSkillRecord = {
+  skill_type: "OFFER" | "REQUEST";
+  skill: { name: string };
+};
+
+export const toProfileSkills = (userSkills: UserSkillRecord[]) => ({
+  offeredSkills: userSkills
+    .filter((entry) => entry.skill_type === "OFFER")
+    .map((entry) => entry.skill.name),
+  requiredSkills: userSkills
+    .filter((entry) => entry.skill_type === "REQUEST")
+    .map((entry) => entry.skill.name),
+});
+
 export const toBasicProfile = (user: ProfileUserRecord) => ({
   name: user.full_name,
   username: user.username,
   bio: user.bio,
   profilePicture: user.profile_image,
+});
+
+export const toUpdatableProfile = (
+  user: ProfileUserRecord,
+  userSkills: UserSkillRecord[],
+) => ({
+  ...toBasicProfile(user),
+  ...toProfileSkills(userSkills),
 });
 
 type ExchangeRecord = {
