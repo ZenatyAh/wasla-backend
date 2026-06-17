@@ -2560,6 +2560,22 @@ export const openApiSpec = {
           name: { type: "string", minLength: 3, maxLength: 100 },
           bio: { type: "string", maxLength: 500, nullable: true },
           profilePicture: { type: "string", format: "uri", nullable: true },
+          offeredSkills: {
+            type: "array",
+            minItems: 1,
+            maxItems: 10,
+            items: { type: "string", minLength: 2 },
+            description:
+              "Full list of skills the user offers; replaces existing offered skills when provided",
+          },
+          requiredSkills: {
+            type: "array",
+            minItems: 1,
+            maxItems: 10,
+            items: { type: "string", minLength: 2 },
+            description:
+              "Full list of skills the user needs; replaces existing required skills when provided",
+          },
         },
       },
       BasicProfileResponse: {
@@ -2572,6 +2588,14 @@ export const openApiSpec = {
               username: { type: "string" },
               bio: { type: "string", nullable: true },
               profilePicture: { type: "string", nullable: true },
+              offeredSkills: {
+                type: "array",
+                items: { type: "string" },
+              },
+              requiredSkills: {
+                type: "array",
+                items: { type: "string" },
+              },
             },
           },
         },

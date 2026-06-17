@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+export const userSkillsArraySchema = z
+  .array(z.string().min(2))
+  .min(1)
+  .max(10)
+  .refine((items) => new Set(items).size === items.length, {
+    message: "Array contains duplicate values; each item must be unique",
+  });
+
 export const skillCategorySchema = z.enum(["TECHNICAL", "GENERAL"]);
 
 export const listSkillsQuerySchema = z.object({

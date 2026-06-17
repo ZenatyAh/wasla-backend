@@ -1,9 +1,11 @@
 import { prisma } from "../../lib/prisma.js";
 import { ChatError } from "../chat/chat.errors.js";
+import { syncUserSkillsByType } from "../skills/userSkills.service.js";
 import type { UpdateProfileInput } from "./profile.schema.js";
 import {
   toBasicProfile,
   toRecentExchange,
+  toUpdatableProfile,
 } from "./profile.mapper.js";
 
 export const getUserProfile = async (userId: number) => {
@@ -92,25 +94,46 @@ export const updateUserProfile = async (
   userId: number,
   data: UpdateProfileInput,
 ) => {
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      ...(data.name !== undefined ? { full_name: data.name } : {}),
-      ...(data.bio !== undefined ? { bio: data.bio } : {}),
-      ...(data.profilePicture !== undefined
-        ? { profile_image: data.profilePicture }
-        : {}),
-    },
-    select: {
-      full_name: true,
-      username: true,
-      bio: true,
-      profile_image: true,
-      available_balance: true,
-    },
+  const user = await prisma.$transaction(async (tx) => {
+    const updatedUser = await tx.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.name !== undefined ? { full_name: data.name } : {}),
+        ...(data.bio !== undefined ? { bio: data.bio } : {}),
+        ...(data.profilePicture !== undefined
+          ? { profile_image: data.profilePicture }
+          : {}),
+      },
+      select: {
+        full_name: true,
+        username: true,
+        bio: true,
+        profile_image: true,
+        available_balance: true,
+      },
+    });
+
+    if (data.offeredSkills !== undefined) {
+      await syncUserSkillsByType(tx, userId, data.offeredSkills, "OFFER");
+    }
+
+    if (data.requiredSkills !== undefined) {
+      await syncUserSkillsByType(tx, userId, data.requiredSkills, "REQUEST");
+    }
+
+    return updatedUser;
   });
 
-  return { profile: toBasicProfile(user) };
+  const userSkills = await prisma.userSkill.findMany({
+    where: { user_id: userId },
+    select: {
+      skill_type: true,
+      skill: { select: { name: true } },
+    },
+    orderBy: { created_at: "asc" },
+  });
+
+  return { profile: toUpdatableProfile(user, userSkills) };
 };
 
 export const assertUserExists = async (userId: number) => {
