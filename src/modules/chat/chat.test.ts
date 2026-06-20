@@ -353,5 +353,33 @@ if (!hasTestDatabase) {
       assert.equal(notifications.status, 200);
       assert.ok(notifications.body.notifications.length >= 1);
     });
+
+    it("marks all notifications as read", async () => {
+      const unreadBefore = await request(app)
+        .get("/notifications")
+        .set(authHeader(ownerToken));
+
+      assert.equal(unreadBefore.status, 200);
+      assert.ok(unreadBefore.body.notifications.some((n: { isRead: boolean }) => !n.isRead));
+
+      for (const path of ["/notifications/read-all", "/notifications/all/read"]) {
+        await prisma.notification.updateMany({
+          where: { userId: ownerId },
+          data: { isRead: false },
+        });
+
+        const response = await request(app)
+          .patch(path)
+          .set(authHeader(ownerToken));
+
+        assert.equal(response.status, 200);
+        assert.equal(response.body.message, "All notifications marked as read");
+
+        const unreadCount = await prisma.notification.count({
+          where: { userId: ownerId, isRead: false },
+        });
+        assert.equal(unreadCount, 0);
+      }
+    });
   });
 }

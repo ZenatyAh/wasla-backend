@@ -1110,6 +1110,27 @@ export const openApiSpec = {
       patch: {
         tags: ["Notifications"],
         summary: "Mark all notifications as read",
+        description:
+          "Also available at `PATCH /notifications/all/read` for clients that follow the same `/:id/read` path pattern.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "All notifications marked as read",
+            content: {
+              "application/json": {
+                example: { message: "All notifications marked as read" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/notifications/all/read": {
+      patch: {
+        tags: ["Notifications"],
+        summary: "Mark all notifications as read (alias)",
+        description: "Alias of `PATCH /notifications/read-all`.",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": {
