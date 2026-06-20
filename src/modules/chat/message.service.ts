@@ -64,7 +64,7 @@ const processMessageSideEffects = (params: {
       senderName,
       conversationId,
       messageId,
-      postId: conversation?.postId,
+      postId: conversation?.postId ?? undefined,
       preview,
     });
 
