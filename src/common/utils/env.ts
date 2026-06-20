@@ -40,3 +40,19 @@ export const RECOMMENDER_TIMEOUT_MS = Number(
 export const RECOMMENDER_ENABLED = Boolean(
   RECOMMENDER_URL && RECOMMENDER_API_KEY,
 );
+
+export const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY?.trim() || "";
+export const CLERK_PUBLISHABLE_KEY =
+  process.env.CLERK_PUBLISHABLE_KEY?.trim() || "";
+export const CLERK_WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET?.trim() || "";
+export const CLERK_ACCOUNT_PORTAL_URL =
+  process.env.CLERK_ACCOUNT_PORTAL_URL?.trim() || "";
+export const CLERK_ENABLED = Boolean(
+  CLERK_SECRET_KEY && CLERK_WEBHOOK_SECRET,
+);
+export const CLERK_SESSION_ENABLED = Boolean(
+  CLERK_SECRET_KEY && CLERK_PUBLISHABLE_KEY,
+);
+export const CLERK_FORGOT_PASSWORD_ENABLED = Boolean(
+  CLERK_SECRET_KEY && CLERK_ACCOUNT_PORTAL_URL,
+);

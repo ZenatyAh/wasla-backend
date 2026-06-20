@@ -313,7 +313,7 @@ export const openApiSpec = {
         tags: ["Auth"],
         summary: "Request a password reset email",
         description:
-          "Always returns the same success message so the API does not reveal whether an email exists.",
+          "Legacy local reset flow for users without a Clerk account. Clerk-linked users should use `POST /auth/clerk/forgot-password`. Always returns the same success message so the API does not reveal whether an email exists.",
         requestBody: {
           required: true,
           content: {
@@ -351,6 +351,8 @@ export const openApiSpec = {
       post: {
         tags: ["Auth"],
         summary: "Reset password using email token",
+        description:
+          "Legacy local reset completion. Deprecated for Clerk-linked users; password changes for those accounts happen in Clerk and sync via webhook.",
         requestBody: {
           required: true,
           content: {
@@ -383,6 +385,77 @@ export const openApiSpec = {
           "429": {
             $ref: "#/components/responses/TooManyRequests",
           },
+        },
+      },
+    },
+    "/auth/clerk/session": {
+      post: {
+        tags: ["Auth"],
+        summary: "Exchange Clerk session for Wasla tokens",
+        description:
+          "After signing in with Clerk on the frontend, call this endpoint with the Clerk session JWT in `Authorization: Bearer <token>` to receive Wasla access and refresh tokens.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Wasla tokens issued",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/AuthResponse" },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "400": { $ref: "#/components/responses/BadRequest" },
+        },
+      },
+    },
+    "/auth/clerk/forgot-password": {
+      post: {
+        tags: ["Auth"],
+        summary: "Start Clerk password reset for linked users",
+        description:
+          "Returns the same privacy-preserving message for all requests. When the user is linked to Clerk, the response may include a Clerk Account Portal reset URL.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ForgotPasswordRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Reset request accepted",
+            content: {
+              "application/json": {
+                example: {
+                  message: "If the email exists, we sent a reset link",
+                  resetUrl: "https://your-app.accounts.dev/reset-password",
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "429": { $ref: "#/components/responses/TooManyRequests" },
+        },
+      },
+    },
+    "/webhooks/clerk": {
+      post: {
+        tags: ["Auth"],
+        summary: "Clerk webhook receiver",
+        description:
+          "Svix-signed webhook endpoint for Clerk user lifecycle events. Not intended for direct client use.",
+        responses: {
+          "200": {
+            description: "Webhook processed",
+            content: {
+              "application/json": {
+                example: { received: true },
+              },
+            },
+          },
+          "400": { description: "Invalid webhook signature or payload" },
         },
       },
     },

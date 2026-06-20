@@ -47,9 +47,11 @@ export const deleteAccountService = async (
     throw new Error("Cannot delete account with active service exchanges");
   }
 
-  const isValidPassword = await bcrypt.compare(password, user.password_hash);
-  if (!isValidPassword) {
-    throw new Error("Invalid password");
+  if (user.password_hash) {
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    if (!isValidPassword) {
+      throw new Error("Invalid password");
+    }
   }
 
   const deletedAt = new Date();

@@ -1,36 +1,10 @@
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const getEmailConfig = () => {
-  const user = process.env.EMAIL_USER?.trim();
-  const pass = process.env.EMAIL_PASSWORD?.trim();
-
-  if (!user || !pass) {
-    throw new Error(
-      "Missing EMAIL_USER or EMAIL_PASSWORD environment variable",
-    );
-  }
-
-  return { user, pass };
-};
-
-export const sendResetEmail = async (to: string, token: string) => {
-  const { user, pass } = getEmailConfig();
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-  const resetLink = `${frontendUrl}/reset-password?token=${token}`;
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user,
-      pass,
-    },
-  });
-
-  await transporter.sendMail({
-    from: `"Wasla" <${user}>`,
-    to,
-    subject: "Reset your password",
-    text: `Reset your password: ${resetLink}`,
-    html: `
+const buildResetEmailContent = (resetLink: string) => ({
+  subject: "Reset your password",
+  text: `Reset your password: ${resetLink}`,
+  html: `
       <div style="font-family: Arial, sans-serif; background-color:#f6f9fc; padding:40px 0;">
         <div style="max-width:520px; margin:0 auto; background:#ffffff; border-radius:12px; padding:30px; box-shadow:0 4px 20px rgba(0,0,0,0.05); text-align:center;">
           
@@ -58,5 +32,69 @@ export const sendResetEmail = async (to: string, token: string) => {
         </div>
       </div>
       `,
+});
+
+const sendViaResend = async (
+  to: string,
+  content: ReturnType<typeof buildResetEmailContent>,
+) => {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) {
+    return false;
+  }
+
+  const from =
+    process.env.RESEND_FROM?.trim() || "Wasla <onboarding@resend.dev>";
+  const resend = new Resend(apiKey);
+  const { error } = await resend.emails.send({
+    from,
+    to,
+    subject: content.subject,
+    html: content.html,
+    text: content.text,
   });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return true;
+};
+
+const sendViaGmail = async (
+  to: string,
+  content: ReturnType<typeof buildResetEmailContent>,
+) => {
+  const user = process.env.EMAIL_USER?.trim();
+  const pass = process.env.EMAIL_PASSWORD?.trim();
+
+  if (!user || !pass) {
+    throw new Error(
+      "Missing email provider. Set RESEND_API_KEY or EMAIL_USER and EMAIL_PASSWORD.",
+    );
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass },
+  });
+
+  await transporter.sendMail({
+    from: `"Wasla" <${user}>`,
+    to,
+    subject: content.subject,
+    text: content.text,
+    html: content.html,
+  });
+};
+
+export const sendResetEmail = async (to: string, token: string) => {
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const resetLink = `${frontendUrl}/reset-password?token=${token}`;
+  const content = buildResetEmailContent(resetLink);
+
+  const sentViaResend = await sendViaResend(to, content);
+  if (!sentViaResend) {
+    await sendViaGmail(to, content);
+  }
 };

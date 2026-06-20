@@ -5,9 +5,11 @@ import {
   invalidJsonBodyHandler,
   jsonBodyMiddleware,
 } from "./common/middleware/jsonBody.middleware.js";
+import { clerkWebhookController } from "./modules/auth/clerk/clerk.webhook.controller.js";
 import { chatFrontendHtml } from "./docs/chatFrontendHtml.js";
 import { openApiSpec } from "./docs/openapi.js";
 import { swaggerHtml } from "./docs/swaggerHtml.js";
+import { CLERK_ENABLED } from "./common/utils/env.js";
 const app = express();
 export default app;
 
@@ -35,6 +37,13 @@ app.use(
     credentials: true,
   }),
 );
+if (CLERK_ENABLED) {
+  app.post(
+    "/webhooks/clerk",
+    express.raw({ type: "application/json" }),
+    clerkWebhookController,
+  );
+}
 app.use(...jsonBodyMiddleware);
 app.set("trust proxy", 1);
 app.get("/", (_req, res) => {

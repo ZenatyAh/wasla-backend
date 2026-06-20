@@ -5,6 +5,7 @@ import {
   registerSchema,
   loginschema,
   resetPasswordSchema,
+  clerkForgotPasswordSchema,
 } from "./auth.schema.js";
 import validate from "../../common/middleware/validateResource.js";
 import { loginLimite } from "../../common/middleware/ratelimi.js";
@@ -12,7 +13,16 @@ import { forgetPasswordControllers } from "./forget-password/forgetPassword.cont
 import { resetPasswordController } from "./forget-password/resetPassword.controller.js";
 import { logoutController } from "./logout.controller.js";
 import { refreshController } from "./refresh.controller.js";
+import { clerkAuthMiddleware } from "../../common/middleware/clerk.middleware.js";
+import { clerkSessionController } from "./clerk/clerk.session.controller.js";
+import { clerkForgotPasswordController } from "./clerk/clerk.password.controller.js";
+import {
+  CLERK_FORGOT_PASSWORD_ENABLED,
+  CLERK_SESSION_ENABLED,
+} from "../../common/utils/env.js";
+
 const router = Router();
+
 router.post(
   "/login",
   loginLimite(5, 60 * 1000),
@@ -31,6 +41,18 @@ router.post(
   validate(resetPasswordSchema),
   resetPasswordController,
 );
+if (CLERK_SESSION_ENABLED) {
+  router.post("/clerk/session", clerkAuthMiddleware, clerkSessionController);
+}
+if (CLERK_FORGOT_PASSWORD_ENABLED) {
+  router.post(
+    "/clerk/forgot-password",
+    loginLimite(3, 1000),
+    validate(clerkForgotPasswordSchema),
+    clerkForgotPasswordController,
+  );
+}
 router.post("/refresh", refreshController);
 router.post("/logout", logoutController);
+
 export default router;

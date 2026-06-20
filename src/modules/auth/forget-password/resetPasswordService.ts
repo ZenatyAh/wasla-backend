@@ -34,6 +34,16 @@ export const resetPasswordService = async (
     if (!resetToken) {
       throw new Error("Invalid or expired token");
     }
+
+    const user = await tx.user.findUnique({
+      where: { id: resetToken.userId },
+      select: { clerk_user_id: true },
+    });
+
+    if (user?.clerk_user_id) {
+      throw new Error("Please reset your password through Clerk");
+    }
+
     const hashPassword = await bcrypt.hash(newPassword, 10);
 
     await tx.user.update({

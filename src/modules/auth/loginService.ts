@@ -17,6 +17,14 @@ export const loginService = async (data: any, meta: any) => {
     throw new Error(`Invalid credentials`);
   }
 
+  if (user.clerk_user_id) {
+    throw new Error("Please sign in with Clerk");
+  }
+
+  if (!user.password_hash) {
+    throw new Error(`Invalid credentials`);
+  }
+
   const isVaild = await bcrypt.compare(password, user.password_hash);
   if (!isVaild) {
     throw new Error(`Invalid credentials`);

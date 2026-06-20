@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { JWT_SECRET } from "./env.js";
 import jwt from "jsonwebtoken";
 
@@ -17,7 +18,7 @@ export const signAccessToken = (userId: string) => {
   return jwt.sign(
     { userId, type: JWT_TOKEN_TYPES.ACCESS },
     JWT_SECRET,
-    { expiresIn: "15m" },
+    { expiresIn: "15m", jwtid: randomUUID() },
   );
 };
 
@@ -25,7 +26,7 @@ export const RefreshAccessToken = (userId: string) => {
   return jwt.sign(
     { userId, type: JWT_TOKEN_TYPES.REFRESH },
     JWT_SECRET,
-    { expiresIn: "7d" },
+    { expiresIn: "7d", jwtid: randomUUID() },
   );
 };
 

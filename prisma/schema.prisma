@@ -13,7 +13,8 @@ model User {
   full_name             String
   username              String               @unique
   email                 String               @unique
-  password_hash         String
+  clerk_user_id         String?              @unique
+  password_hash         String?
   bio                   String?
   profile_image         String?
   available_balance     Int                  @default(5)

@@ -21,6 +21,10 @@ export const resetPasswordSchema = z.object({
   newPassword: passwordSchema,
 });
 
+export const clerkForgotPasswordSchema = z.object({
+  email: emailSchema,
+});
+
 export const registerSchema = z.object({
   full_name: z
     .string()
@@ -51,3 +55,4 @@ export const registerSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginschema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type ClerkForgotPasswordInput = z.infer<typeof clerkForgotPasswordSchema>;

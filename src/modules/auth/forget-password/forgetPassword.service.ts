@@ -11,6 +11,10 @@ export const forgetPasswordService = async (email: string) => {
     return;
   }
 
+  if (user.clerk_user_id) {
+    return;
+  }
+
   await prisma.passwordResetToken.deleteMany({
     where: { userId: user.id },
   });
