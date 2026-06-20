@@ -73,7 +73,7 @@ export const toConversationResponse = (
   return {
     id: conversation.id,
     postId: conversation.postId,
-    post: conversation.post,
+    post: conversation.post ?? null,
     participants: conversation.participants.map((participant) => ({
       userId: participant.userId,
       joinedAt: participant.joinedAt,

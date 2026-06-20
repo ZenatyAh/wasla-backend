@@ -3,12 +3,14 @@ import { sendError } from "../../common/utils/httpError.js";
 import {
   conversationIdParamSchema,
   createConversationSchema,
+  createDirectConversationSchema,
   listConversationsQuerySchema,
   listMessagesQuerySchema,
   sendMessageSchema,
 } from "./chat.schema.js";
 import {
   createOrGetConversation,
+  createOrGetDirectConversation,
   getConversationById,
   listConversations,
 } from "./chat.service.js";
@@ -33,6 +35,27 @@ export const createConversationController = async (
     });
   } catch (err: unknown) {
     return handleChatControllerError(res, err, "Create conversation failed");
+  }
+};
+
+export const createDirectConversationController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return sendError(res, 401, "Unauthorized");
+    }
+
+    const data = createDirectConversationSchema.parse(req.body);
+    const result = await createOrGetDirectConversation(userId, data);
+
+    return res.status(result.isNew ? 201 : 200).json({
+      conversation: result.conversation,
+    });
+  } catch (err: unknown) {
+    return handleChatControllerError(res, err, "Create direct conversation failed");
   }
 };
 
