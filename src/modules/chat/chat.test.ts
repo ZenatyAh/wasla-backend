@@ -28,6 +28,7 @@ if (!hasTestDatabase) {
   let outsiderId = 0;
   let postId = 0;
   let conversationId = "";
+  let directConversationId = "";
   let messageId = "";
 
   let ownerToken = "";
@@ -104,7 +105,11 @@ if (!hasTestDatabase) {
       });
       await prisma.message.deleteMany({
         where: {
-          conversation: { postId },
+          conversation: {
+            participants: {
+              some: { userId: { in: [ownerId, visitorId, outsiderId] } },
+            },
+          },
         },
       });
       await prisma.conversationParticipant.deleteMany({
@@ -113,7 +118,11 @@ if (!hasTestDatabase) {
         },
       });
       await prisma.conversation.deleteMany({
-        where: { postId },
+        where: {
+          participants: {
+            some: { userId: { in: [ownerId, visitorId, outsiderId] } },
+          },
+        },
       });
       await prisma.post.deleteMany({
         where: { id: postId },
@@ -144,6 +153,65 @@ if (!hasTestDatabase) {
 
       assert.equal(response.status, 200);
       assert.equal(response.body.conversation.id, conversationId);
+    });
+
+    it("creates a direct conversation without a post", async () => {
+      const response = await request(app)
+        .post("/conversations/direct")
+        .set(authHeader(visitorToken))
+        .send({ recipientId: ownerId });
+
+      assert.equal(response.status, 201);
+      assert.equal(response.body.conversation.postId, null);
+      assert.equal(response.body.conversation.post, null);
+      assert.ok(response.body.conversation.id);
+      directConversationId = response.body.conversation.id;
+    });
+
+    it("reuses an existing direct conversation", async () => {
+      const response = await request(app)
+        .post("/conversations/direct")
+        .set(authHeader(visitorToken))
+        .send({ recipientId: ownerId });
+
+      assert.equal(response.status, 200);
+      assert.equal(response.body.conversation.id, directConversationId);
+    });
+
+    it("allows either participant to open the same direct conversation", async () => {
+      const response = await request(app)
+        .post("/conversations/direct")
+        .set(authHeader(ownerToken))
+        .send({ recipientId: visitorId });
+
+      assert.equal(response.status, 200);
+      assert.equal(response.body.conversation.id, directConversationId);
+    });
+
+    it("rejects direct conversation with yourself", async () => {
+      const response = await request(app)
+        .post("/conversations/direct")
+        .set(authHeader(visitorToken))
+        .send({ recipientId: visitorId });
+
+      assert.equal(response.status, 400);
+    });
+
+    it("keeps post-linked and direct conversations separate for the same users", async () => {
+      assert.notEqual(conversationId, directConversationId);
+
+      const postConversation = await request(app)
+        .get(`/conversations/${conversationId}`)
+        .set(authHeader(visitorToken));
+
+      const directConversation = await request(app)
+        .get(`/conversations/${directConversationId}`)
+        .set(authHeader(visitorToken));
+
+      assert.equal(postConversation.status, 200);
+      assert.equal(postConversation.body.conversation.postId, postId);
+      assert.equal(directConversation.status, 200);
+      assert.equal(directConversation.body.conversation.postId, null);
     });
 
     it("lists conversations for participant", async () => {

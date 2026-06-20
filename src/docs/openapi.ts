@@ -859,7 +859,9 @@ export const openApiSpec = {
     "/conversations": {
       post: {
         tags: ["Chat"],
-        summary: "Start or reuse a conversation",
+        summary: "Start or reuse a post-linked conversation",
+        description:
+          "Creates or reuses a 1:1 conversation tied to a post. For profile messaging without a post, use `POST /conversations/direct`.",
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -910,6 +912,45 @@ export const openApiSpec = {
             },
           },
           "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
+    "/conversations/direct": {
+      post: {
+        tags: ["Chat"],
+        summary: "Start or reuse a direct conversation",
+        description:
+          "Creates or reuses a 1:1 conversation between the authenticated user and `recipientId` without linking to a post.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateDirectConversationRequest" },
+              example: { recipientId: 2 },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Direct conversation created",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationResponse" },
+              },
+            },
+          },
+          "200": {
+            description: "Existing direct conversation reused",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ConversationResponse" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "404": { description: "Recipient not found" },
         },
       },
     },
@@ -2293,6 +2334,13 @@ export const openApiSpec = {
           recipientId: { type: "integer", example: 2 },
         },
       },
+      CreateDirectConversationRequest: {
+        type: "object",
+        required: ["recipientId"],
+        properties: {
+          recipientId: { type: "integer", example: 2 },
+        },
+      },
       SendMessageRequest: {
         type: "object",
         required: ["body", "clientMessageId"],
@@ -2498,9 +2546,10 @@ export const openApiSpec = {
         type: "object",
         properties: {
           id: { type: "string" },
-          postId: { type: "integer" },
+          postId: { type: "integer", nullable: true },
           post: {
             type: "object",
+            nullable: true,
             properties: {
               id: { type: "integer" },
               title: { type: "string" },

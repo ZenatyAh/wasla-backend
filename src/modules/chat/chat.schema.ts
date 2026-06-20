@@ -5,6 +5,10 @@ export const createConversationSchema = z.object({
   recipientId: z.coerce.number().int().positive().optional(),
 });
 
+export const createDirectConversationSchema = z.object({
+  recipientId: z.coerce.number().int().positive(),
+});
+
 export const listConversationsQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(50).optional().default(20),
@@ -38,6 +42,9 @@ export const messageIdParamSchema = z.object({
 });
 
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
+export type CreateDirectConversationInput = z.infer<
+  typeof createDirectConversationSchema
+>;
 export type ListConversationsQuery = z.infer<typeof listConversationsQuerySchema>;
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
 export type BatchMessageStatusInput = z.infer<typeof batchMessageStatusSchema>;
