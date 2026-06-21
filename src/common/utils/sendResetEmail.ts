@@ -89,7 +89,9 @@ const sendViaGmail = async (
 };
 
 export const sendResetEmail = async (to: string, token: string) => {
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+  const frontendUrl = (
+    process.env.FRONTEND_URL || "http://localhost:3000"
+  ).replace(/\/$/, "");
   const resetLink = `${frontendUrl}/reset-password?token=${token}`;
   const content = buildResetEmailContent(resetLink);
 
