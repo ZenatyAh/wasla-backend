@@ -1,13 +1,16 @@
 import { Router } from "express";
+import { authMiddleware } from "../../common/middleware/auth.middleware.js";
+import validate from "../../common/middleware/validateResource.js";
+import { loginLimite } from "../../common/middleware/ratelimi.js";
 import { loginController } from "./auth.controller.js";
 import { RegisterControler } from "./Register/Register.controller.js";
 import {
-  registerSchema,
+  changePasswordSchema,
   loginschema,
+  registerSchema,
   resetPasswordSchema,
 } from "./auth.schema.js";
-import validate from "../../common/middleware/validateResource.js";
-import { loginLimite } from "../../common/middleware/ratelimi.js";
+import { changePasswordController } from "./change-password/changePassword.controller.js";
 import { forgetPasswordControllers } from "./forget-password/forgetPassword.controller.js";
 import { resetPasswordController } from "./forget-password/resetPassword.controller.js";
 import { logoutController } from "./logout.controller.js";
@@ -30,6 +33,13 @@ router.post(
   loginLimite(5, 1000),
   validate(resetPasswordSchema),
   resetPasswordController,
+);
+router.post(
+  "/change-password",
+  authMiddleware,
+  loginLimite(5, 60 * 1000),
+  validate(changePasswordSchema),
+  changePasswordController,
 );
 router.post("/refresh", refreshController);
 router.post("/logout", logoutController);

@@ -386,6 +386,50 @@ export const openApiSpec = {
         },
       },
     },
+    "/auth/change-password": {
+      post: {
+        tags: ["Auth"],
+        summary: "Change password for authenticated user",
+        description:
+          "Requires the current password. Invalidates all refresh sessions after a successful change.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/ChangePasswordRequest",
+              },
+              example: {
+                currentPassword: "OldPass@123",
+                newPassword: "NewPass@456",
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Password changed successfully",
+            content: {
+              "application/json": {
+                example: {
+                  message: "Password changed successfully",
+                },
+              },
+            },
+          },
+          "401": {
+            $ref: "#/components/responses/Unauthorized",
+          },
+          "400": {
+            $ref: "#/components/responses/BadRequest",
+          },
+          "429": {
+            $ref: "#/components/responses/TooManyRequests",
+          },
+        },
+      },
+    },
     "/auth/refresh": {
       post: {
         tags: ["Auth"],
@@ -2016,6 +2060,24 @@ export const openApiSpec = {
             description:
               "Must include at least one uppercase letter, lowercase letter, digit, and special character.",
             example: "NewPass@123",
+          },
+        },
+      },
+      ChangePasswordRequest: {
+        type: "object",
+        required: ["currentPassword", "newPassword"],
+        properties: {
+          currentPassword: {
+            type: "string",
+            example: "OldPass@123",
+          },
+          newPassword: {
+            type: "string",
+            minLength: 8,
+            maxLength: 50,
+            description:
+              "Must include at least one uppercase letter, lowercase letter, digit, and special character.",
+            example: "NewPass@456",
           },
         },
       },
