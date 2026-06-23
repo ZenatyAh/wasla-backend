@@ -14,6 +14,7 @@
     "prisma:resolve-escrow-failure": "prisma migrate resolve --rolled-back 20260607163129_add_contract_escrow_lifecycle",
     "prisma:seed": "prisma db seed",
     "seed:recommender": "tsx scripts/seed-recommender-dataset.ts",
+    "seed:arabic": "tsx scripts/seed-arabic-demo.ts",
     "seed:interactions": "tsx scripts/seed-recommender-interactions.ts",
     "cleanup:users": "tsx scripts/cleanup-users-keep-30.ts"
   },
