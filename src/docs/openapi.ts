@@ -657,6 +657,13 @@ export const openApiSpec = {
                 query: "سباك في القاهرة",
                 topK: 10,
                 threshold: 0.5,
+                filters: {
+                  category: "OFFER",
+                  serviceMode: "ONLINE",
+                  minCredits: 5,
+                  maxCredits: 20,
+                  location: "القاهرة",
+                },
               },
             },
           },
@@ -1296,6 +1303,12 @@ export const openApiSpec = {
               example: {
                 query: "مطور React",
                 topK: 10,
+                filters: {
+                  skillType: "OFFER",
+                  location: "الإسكندرية",
+                  isOnline: true,
+                  isVerified: true,
+                },
               },
             },
           },
