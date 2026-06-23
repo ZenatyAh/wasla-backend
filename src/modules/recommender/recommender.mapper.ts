@@ -30,7 +30,7 @@ export type RecommenderPost = {
 export type RecommenderInteraction = {
   user_id: string;
   post_id: string;
-  action: "click" | "save" | "apply";
+  action: "click" | "save" | "unsave" | "apply";
   timestamp: string;
 };
 
@@ -119,7 +119,7 @@ export const mapPost = (post: PostForMapping): RecommenderPost => {
 export const mapInteraction = (input: {
   userId: number | string;
   postId: number | string;
-  action: "click" | "save" | "apply";
+  action: "click" | "save" | "unsave" | "apply";
   timestamp?: Date;
 }): RecommenderInteraction => ({
   user_id: String(input.userId),

@@ -47,15 +47,21 @@ const request = async <T>(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), RECOMMENDER_TIMEOUT_MS);
   try {
-    const response = await fetch(`${RECOMMENDER_URL}${path}`, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        "X-Internal-Token": RECOMMENDER_API_KEY,
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: controller.signal,
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${RECOMMENDER_URL}${path}`, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Internal-Token": RECOMMENDER_API_KEY,
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new RecommenderUnavailableError(message);
+    }
 
     if (!response.ok) {
       throw new RecommenderUnavailableError(
@@ -82,24 +88,30 @@ const fireAndForget = (label: string, run: () => Promise<unknown>): void => {
   });
 };
 
+const postForSyncSelect = {
+  id: true,
+  user_id: true,
+  title: true,
+  description: true,
+  category: true,
+  service_mode: true,
+  assigned_time_credits: true,
+  created_at: true,
+  status: true,
+  user: { select: { location: true, ...skillInclude } },
+} as const;
+
 const loadPostForSync = async (
   postId: number,
 ): Promise<RecommenderPost | null> => {
   const post = await prisma.post.findUnique({
     where: { id: postId },
-    select: {
-      id: true,
-      user_id: true,
-      title: true,
-      description: true,
-      category: true,
-      service_mode: true,
-      assigned_time_credits: true,
-      created_at: true,
-      user: { select: { location: true, ...skillInclude } },
-    },
+    select: postForSyncSelect,
   });
-  return post ? mapPost(post as PostForMapping) : null;
+  if (!post || post.status !== "PUBLISHED") {
+    return null;
+  }
+  return mapPost(post as PostForMapping);
 };
 
 const loadUserForSync = async (
@@ -125,7 +137,15 @@ const loadUserForSync = async (
     : null;
 };
 
-/** POST /sync/post — after a post is created or updated. */
+/**
+ * POST /sync/bootstrap — rebuild the recommender index from Express export.
+ * Used when a post is deleted or unpublished (no per-post delete endpoint).
+ */
+export const syncBootstrapRebuild = (): void => {
+  fireAndForget("bootstrap", () => request("POST", "/sync/bootstrap", {}));
+};
+
+/** POST /sync/post — after a published post is created or updated. */
 export const syncPost = (postId: number): void => {
   fireAndForget("post", async () => {
     const post = await loadPostForSync(postId);
@@ -145,11 +165,11 @@ export const syncUser = (userId: number): void => {
   });
 };
 
-/** POST /sync/interaction — after a click / save / apply. */
+/** POST /sync/interaction — after a click / save / unsave / apply. */
 export const syncInteraction = (input: {
   userId: number | string;
   postId: number | string;
-  action: "click" | "save" | "apply";
+  action: "click" | "save" | "unsave" | "apply";
 }): void => {
   fireAndForget("interaction", () =>
     request("POST", "/sync/interaction", mapInteraction(input)),

@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import { ChatError } from "../chat/chat.errors.js";
+import { syncUser } from "../recommender/recommender.client.js";
 import { syncUserSkillsByType } from "../skills/userSkills.service.js";
 import type { UpdateProfileInput } from "./profile.schema.js";
 import {
@@ -132,6 +133,8 @@ export const updateUserProfile = async (
     },
     orderBy: { created_at: "asc" },
   });
+
+  syncUser(userId);
 
   return { profile: toUpdatableProfile(user, userSkills) };
 };
