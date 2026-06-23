@@ -15,7 +15,7 @@
     "prisma:seed": "prisma db seed",
     "seed:recommender": "tsx scripts/seed-recommender-dataset.ts",
     "seed:arabic": "tsx scripts/seed-arabic-demo.ts",
-    "seed:interactions": "tsx scripts/seed-recommender-interactions.ts",
+    "seed:wasla": "tsx scripts/seedWaslaData.ts",
     "cleanup:users": "tsx scripts/cleanup-users-keep-30.ts"
   },
   "prisma": {

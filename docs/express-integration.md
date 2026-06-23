@@ -85,3 +85,57 @@ EXPRESS_TIMEOUT_MS=30000
    when `/sync/bootstrap` is called with an empty body.
 
 Both require the same `X-Internal-Token` value.
+
+## Search proxy
+
+Express exposes authenticated semantic search at `POST /posts/search`. When the
+recommender is configured, Express forwards the query to the AI service:
+
+```
+POST {RECOMMENDER_URL}/search
+Header: X-Internal-Token: <RECOMMENDER_API_KEY>
+```
+
+Request body (snake_case on the AI side):
+
+| Express field | AI field | Notes |
+|---------------|----------|-------|
+| `query` | `query` | Required search text |
+| `topK` | `top_k` | Max results (default 20, max 50) |
+| `threshold` | `threshold` | Optional similarity cutoff 0–1 |
+
+AI response fields used by Express:
+
+| AI field | Express usage |
+|----------|---------------|
+| `query` | Echoed in response |
+| `count` | Not used directly; Express returns hydrated `count` |
+| `results[].post_id` | Hydrate full post from PostgreSQL |
+| `results[].similarity_score` | Mapped to `scores.similarityScore` |
+| `results[].freshness` | Mapped to `scores.freshness` |
+| `results[].trust` | Mapped to `scores.trust` |
+| `results[].final_score` | Mapped to `scores.finalScore` |
+
+When the recommender is disabled, times out, or returns an error, Express falls
+back to case-insensitive `contains` search on `Post.title` and
+`Post.description` for `status = PUBLISHED`, ordered by `created_at` desc.
+Fallback results omit recommender scores (`scores: null`) and set
+`source: "fallback"`.
+
+Search is not part of the export/bootstrap contract; the AI index must already
+contain posts via `/sync/bootstrap`, `/sync/post`, or a pull bootstrap.
+
+## User search
+
+Express exposes authenticated user search at `POST /users/search`. The
+recommender has no user-search endpoint, so matching runs in PostgreSQL only.
+
+Request body:
+
+| Field | Notes |
+|-------|-------|
+| `query` | Required; matched against name, username, bio, location, and skill names |
+| `topK` | Max results (default 20, max 50) |
+
+Response sets `source: "database"`. Deleted users (`deleted_at` set) are
+excluded. Email and other private fields are not returned.

@@ -24,6 +24,13 @@ export const listPostsQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(50).optional().default(20),
 })
 
+export const searchPostsSchema = z.object({
+    query: z.string().trim().min(1).max(500),
+    topK: z.number().int().min(1).max(50).optional().default(20),
+    threshold: z.number().min(0).max(1).optional(),
+})
+
 export type CreatePostInput = z.infer<typeof createPostSchema>
 export type UpdatePostInput = z.infer<typeof updatePostSchema>
 export type ListPostsQuery = z.infer<typeof listPostsQuerySchema>
+export type SearchPostsInput = z.infer<typeof searchPostsSchema>

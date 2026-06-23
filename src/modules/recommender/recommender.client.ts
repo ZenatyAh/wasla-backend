@@ -29,6 +29,23 @@ const skillInclude = {
 type RecommendItem = { post_id: string; score?: number; final_score?: number };
 type RecommendResponse = { recommendations: RecommendItem[] };
 
+export type RecommenderSearchItem = {
+  post_id: string | number;
+  title: string;
+  category: string;
+  post_type: string;
+  similarity_score: number;
+  freshness: number;
+  trust: number;
+  final_score: number;
+};
+
+export type RecommenderSearchResponse = {
+  query: string;
+  count: number;
+  results: RecommenderSearchItem[];
+};
+
 class RecommenderUnavailableError extends Error {
   constructor(message: string) {
     super(message);
@@ -197,6 +214,25 @@ export const fetchRecommendedPostIds = async (
   return data.recommendations
     .map((item) => Number(item.post_id))
     .filter((id) => Number.isInteger(id));
+};
+
+/**
+ * POST /search — semantic search over indexed posts.
+ * Throws RecommenderUnavailableError when the service is down/disabled so the
+ * caller can fall back to database text search.
+ */
+export const fetchSearchResults = async (
+  query: string,
+  options?: { top_k?: number; threshold?: number },
+): Promise<RecommenderSearchResponse> => {
+  const body: Record<string, unknown> = { query };
+  if (options?.top_k !== undefined) {
+    body.top_k = options.top_k;
+  }
+  if (options?.threshold !== undefined) {
+    body.threshold = options.threshold;
+  }
+  return request<RecommenderSearchResponse>("POST", "/search", body);
 };
 
 export { RecommenderUnavailableError };

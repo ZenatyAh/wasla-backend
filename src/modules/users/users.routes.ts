@@ -9,11 +9,14 @@ import {
 import { deleteAccountController } from "./deleteAccount.controller.js";
 import { deleteAccountSchema } from "./deleteAccount.schema.js";
 import { updateProfileSchema } from "./profile.schema.js";
+import { searchUsersController } from "./users.search.controller.js";
+import { searchUsersSchema } from "./users.search.schema.js";
 
 const router = Router();
 
 router.use(authMiddleware);
 
+router.post("/search", validate(searchUsersSchema), searchUsersController);
 router.delete(
   "/account",
   validate(deleteAccountSchema),

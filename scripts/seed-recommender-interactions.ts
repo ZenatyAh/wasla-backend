@@ -404,6 +404,27 @@ const testRecommendations = async () => {
   });
 };
 
+const testSearch = async () => {
+  const sampleQuery = process.env.SEED_SEARCH_QUERY || "سباك";
+  console.log(`\n[interactions] Testing search for query "${sampleQuery}"...`);
+
+  const aiResponse = await withRetry("search", () =>
+    fetch(`${RECOMMENDER_URL}/search`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Token": RECOMMENDER_API_KEY,
+      },
+      body: JSON.stringify({ query: sampleQuery, top_k: 5 }),
+    }),
+  );
+  const aiBody = (await aiResponse.json()) as {
+    count?: number;
+    results?: { post_id: string; final_score?: number; title?: string }[];
+  };
+  console.log("[interactions] AI /search:", JSON.stringify(aiBody));
+};
+
 const main = async () => {
   console.log(`[interactions] Mode=${SEED_MODE}, target=${INTERACTION_COUNT}, run=${SEED_RUN_ID}`);
 
@@ -420,6 +441,7 @@ const main = async () => {
 
   await bootstrapAi();
   await testRecommendations();
+  await testSearch();
 };
 
 main().catch((err) => {

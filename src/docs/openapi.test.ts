@@ -60,6 +60,8 @@ describe("OpenAPI spec", () => {
   it("documents feed and internal export routes", () => {
     assert.ok("/feed/{userId}" in openApiSpec.paths);
     assert.ok("/internal/recommender-export" in openApiSpec.paths);
+    assert.ok("/posts/search" in openApiSpec.paths);
+    assert.ok("/users/search" in openApiSpec.paths);
   });
 
   it("documents skills routes", () => {

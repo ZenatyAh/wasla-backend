@@ -41,6 +41,26 @@ export const toBasicProfile = (user: ProfileUserRecord) => ({
   profilePicture: user.profile_image,
 });
 
+export type SearchUserRecord = {
+  id: number;
+  username: string;
+  full_name: string;
+  bio: string | null;
+  profile_image: string | null;
+  location: string | null;
+  skills: UserSkillRecord[];
+};
+
+export const toSearchUserResponse = (user: SearchUserRecord) => ({
+  id: user.id,
+  username: user.username,
+  name: user.full_name,
+  bio: user.bio,
+  profilePicture: user.profile_image,
+  location: user.location,
+  ...toProfileSkills(user.skills),
+});
+
 export const toUpdatableProfile = (
   user: ProfileUserRecord,
   userSkills: UserSkillRecord[],

@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import {createPostService,deletePostService,getPostByIdService,listMyPostsService,listPublishedPostsService,listSavedPostsService,savePostService,unsavePostService,updatePostService,} from "./posts.service.js";
+import { searchPostsService } from "./posts.search.service.js";
 import type { CreatePostInput, UpdatePostInput } from "./posts.schema.js";
 import { listPostsQuerySchema } from "./posts.schema.js";
 import { getErrorMessage, sendError } from "../../common/utils/httpError.js";
@@ -162,5 +163,19 @@ export const listSavedPostsController = async (req: Request, res: Response) => {
       return sendError(res, 400, "Invalid request data")
     }
     return sendError(res, 400, getErrorMessage(err, "Fetch saved posts failed"));
+  }
+};
+
+export const searchPostsController = async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) {
+      return sendError(res, 401, "Unauthorized");
+    }
+
+    const result = await searchPostsService(req.body);
+    return res.json(result);
+  } catch (err: unknown) {
+    return sendError(res, 500, getErrorMessage(err, "Search posts failed"));
   }
 };
