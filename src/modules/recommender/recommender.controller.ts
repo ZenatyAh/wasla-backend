@@ -7,6 +7,8 @@ import {
   toPostResponse,
   type PostRecord,
 } from "../posts/posts.mapper.js";
+import { listPostsQuerySchema } from "../posts/posts.schema.js";
+import { buildPostCursorFilter } from "../posts/posts.pagination.js";
 import {
   fetchRecommendedPostIds,
   RecommenderUnavailableError,
@@ -38,15 +40,14 @@ export const recommenderExportController = async (
  * DB preserving order, and falls back to a chronological feed when the
  * recommender is unavailable (down, disabled, timed out, or 503).
  */
-const FEED_LIMIT = 20;
-
 const mapFeedPosts = (posts: PostRecord[]) => posts.map(toPostResponse);
 
-const chronologicalFeed = async () => {
+const chronologicalFeed = async (limit: number, cursor?: number) => {
+  const cursorFilter = await buildPostCursorFilter(cursor);
   const posts = await prisma.post.findMany({
-    where: { status: "PUBLISHED" },
-    orderBy: { created_at: "desc" },
-    take: FEED_LIMIT,
+    where: { status: "PUBLISHED", ...cursorFilter },
+    orderBy: [{ created_at: "desc" }, { id: "desc" }],
+    take: limit,
     select: postSelect,
   });
   return mapFeedPosts(posts as PostRecord[]);
@@ -74,11 +75,23 @@ export const feedController = async (req: Request, res: Response) => {
     return sendError(res, 400, "Invalid user id");
   }
 
+  let query;
   try {
-    const order = await fetchRecommendedPostIds(userId, FEED_LIMIT);
+    query = listPostsQuerySchema.parse(req.query);
+  } catch {
+    return sendError(res, 400, "Invalid request data");
+  }
+
+  const limit = query.limit ?? 20;
+
+  try {
+    const order = await fetchRecommendedPostIds(userId, limit);
 
     if (order.length === 0) {
-      return res.json({ posts: await chronologicalFeed(), source: "fallback" });
+      return res.json({
+        posts: await chronologicalFeed(limit, query.cursor),
+        source: "fallback",
+      });
     }
 
     return res.json({
@@ -87,7 +100,10 @@ export const feedController = async (req: Request, res: Response) => {
     });
   } catch (err: unknown) {
     if (err instanceof RecommenderUnavailableError) {
-      return res.json({ posts: await chronologicalFeed(), source: "fallback" });
+      return res.json({
+        posts: await chronologicalFeed(limit, query.cursor),
+        source: "fallback",
+      });
     }
     return sendError(res, 500, getErrorMessage(err, "Feed failed"));
   }
