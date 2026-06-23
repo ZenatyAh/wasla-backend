@@ -46,6 +46,18 @@ export const SERVICE_MODE_LABEL: Record<string, string> = {
   OFFLINE: "وجاهي",
 };
 
+/** Gaza Strip cities recognized when deriving online post location from text. */
+export const GAZA_STRIP_LOCATIONS = [
+  "غزة",
+  "خانيونس",
+  "النصيرات",
+  "المغازي",
+  "البريج",
+  "رفح",
+  "جباليا",
+  "دير البلح",
+] as const;
+
 type SkillRow = { skill_type: "OFFER" | "REQUEST"; skill: { name: string } };
 
 export type UserForMapping = {
@@ -90,31 +102,60 @@ export type PostForMapping = {
   };
 };
 
-/**
- * Posts have no topical category or location of their own, so we derive both
- * from the author: the topical `category` is the author's first skill matching
- * the post type (OFFER post -> first offered skill; REQUEST post -> first
- * needed skill), and `location` falls back to the author's city.
- */
-export const mapPost = (post: PostForMapping): RecommenderPost => {
-  const wantedSkillType = post.category === "REQUEST" ? "REQUEST" : "OFFER";
-  const derivedCategory =
-    post.user.skills.find((s) => s.skill_type === wantedSkillType)?.skill
-      .name ?? "";
+const skillNamesForType = (
+  skills: SkillRow[],
+  skillType: "OFFER" | "REQUEST",
+): string[] =>
+  skills.filter((s) => s.skill_type === skillType).map((s) => s.skill.name);
 
-  return {
-    post_id: String(post.id),
-    user_id: String(post.user_id),
-    post_type: POST_TYPE_BY_CATEGORY[post.category] ?? post.category,
-    category: derivedCategory,
-    title: post.title,
-    description: post.description,
-    service_mode: SERVICE_MODE_LABEL[post.service_mode] ?? post.service_mode,
-    location: post.user.location ?? "",
-    time_credits: post.assigned_time_credits,
-    timestamp: post.created_at.toISOString(),
-  };
+/**
+ * Posts have no topical category column; match the author's skill name in the
+ * title/description when present, otherwise fall back to the first skill of
+ * the matching type (OFFER post -> offered skills, REQUEST -> needed skills).
+ */
+export const derivePostCategory = (post: PostForMapping): string => {
+  const wantedSkillType = post.category === "REQUEST" ? "REQUEST" : "OFFER";
+  const names = skillNamesForType(post.user.skills, wantedSkillType);
+  if (names.length === 0) return "";
+
+  const content = `${post.title} ${post.description}`;
+  const parenMatch = names.find((name) => content.includes(`(${name})`));
+  if (parenMatch) return parenMatch;
+
+  const matched = names
+    .filter((name) => content.includes(name))
+    .sort((a, b) => b.length - a.length);
+
+  return matched[0] ?? names[0] ?? "";
 };
+
+/**
+ * In-person posts use the author's city. Online posts may mention any Gaza
+ * Strip city in the text; otherwise the author's city is used.
+ */
+export const derivePostLocation = (post: PostForMapping): string => {
+  const authorLocation = post.user.location ?? "";
+  if (post.service_mode === "OFFLINE") {
+    return authorLocation;
+  }
+
+  const content = `${post.title} ${post.description}`;
+  const matched = GAZA_STRIP_LOCATIONS.find((city) => content.includes(city));
+  return matched ?? authorLocation;
+};
+
+export const mapPost = (post: PostForMapping): RecommenderPost => ({
+  post_id: String(post.id),
+  user_id: String(post.user_id),
+  post_type: POST_TYPE_BY_CATEGORY[post.category] ?? post.category,
+  category: derivePostCategory(post),
+  title: post.title,
+  description: post.description,
+  service_mode: SERVICE_MODE_LABEL[post.service_mode] ?? post.service_mode,
+  location: derivePostLocation(post),
+  time_credits: post.assigned_time_credits,
+  timestamp: post.created_at.toISOString(),
+});
 
 export const mapInteraction = (input: {
   userId: number | string;

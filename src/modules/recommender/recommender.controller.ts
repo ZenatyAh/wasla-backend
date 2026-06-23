@@ -7,6 +7,7 @@ import {
   toPostResponse,
   type PostRecord,
 } from "../posts/posts.mapper.js";
+import { hydratePublishedPostsById } from "../posts/posts.hydration.js";
 import { listPostsQuerySchema } from "../posts/posts.schema.js";
 import {
   buildPostCursorFilter,
@@ -66,19 +67,8 @@ const chronologicalFeed = async (
   return { posts: mapFeedPosts(items), nextCursor };
 };
 
-const hydrateFeedPosts = async (order: number[]) => {
-  const posts = await prisma.post.findMany({
-    where: { id: { in: order }, status: "PUBLISHED" },
-    select: postSelect,
-  });
-  const byId = new Map(
-    (posts as PostRecord[]).map((post) => [post.id, post]),
-  );
-  const ordered = order
-    .map((id) => byId.get(id))
-    .filter((post): post is PostRecord => Boolean(post));
-  return mapFeedPosts(ordered);
-};
+const hydrateFeedPosts = async (order: number[]) =>
+  hydratePublishedPostsById(order);
 
 const recommendedFeed = async (
   userId: number,

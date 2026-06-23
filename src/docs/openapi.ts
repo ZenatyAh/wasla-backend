@@ -641,6 +641,40 @@ export const openApiSpec = {
         },
       },
     },
+    "/posts/search": {
+      post: {
+        tags: ["Posts"],
+        summary: "Search published posts",
+        description:
+          "Semantic search over published posts via the recommender when available. Falls back to database text search on title and description when the recommender is disabled or unavailable.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SearchPostsRequest" },
+              example: {
+                query: "سباك في القاهرة",
+                topK: 10,
+                threshold: 0.5,
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Search results",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/PostSearchResponse" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+        },
+      },
+    },
     "/posts/{postId}": {
       get: {
         tags: ["Posts"],
@@ -1244,6 +1278,39 @@ export const openApiSpec = {
           },
           "401": { $ref: "#/components/responses/Unauthorized" },
           "404": { description: "Notification not found" },
+        },
+      },
+    },
+    "/users/search": {
+      post: {
+        tags: ["Profile"],
+        summary: "Search users",
+        description:
+          "Search active users by name, username, bio, location, or skill names. Results are matched in the database (the recommender does not expose user search).",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/SearchUsersRequest" },
+              example: {
+                query: "مطور React",
+                topK: 10,
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "User search results",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/UserSearchResponse" },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
         },
       },
     },
@@ -2245,6 +2312,152 @@ export const openApiSpec = {
           },
         },
         required: ["posts", "nextCursor", "source"],
+      },
+      SearchPostsRequest: {
+        type: "object",
+        required: ["query"],
+        properties: {
+          query: {
+            type: "string",
+            minLength: 1,
+            maxLength: 500,
+            example: "سباك في القاهرة",
+          },
+          topK: {
+            type: "integer",
+            minimum: 1,
+            maximum: 50,
+            default: 20,
+            example: 20,
+          },
+          threshold: {
+            type: "number",
+            minimum: 0,
+            maximum: 1,
+            example: 0.5,
+            description:
+              "Minimum similarity score (0–1). Only sent to the recommender when provided.",
+          },
+        },
+      },
+      PostSearchScores: {
+        type: "object",
+        properties: {
+          similarityScore: { type: "number", example: 0.91 },
+          freshness: { type: "number", example: 0.8 },
+          trust: { type: "number", example: 0.7 },
+          finalScore: { type: "number", example: 0.85 },
+        },
+        required: [
+          "similarityScore",
+          "freshness",
+          "trust",
+          "finalScore",
+        ],
+      },
+      PostSearchResultItem: {
+        type: "object",
+        properties: {
+          post: { $ref: "#/components/schemas/Post" },
+          scores: {
+            oneOf: [
+              { $ref: "#/components/schemas/PostSearchScores" },
+              { type: "null" },
+            ],
+            description:
+              "Recommender scores when source is recommender; null for fallback results.",
+          },
+        },
+        required: ["post", "scores"],
+      },
+      PostSearchResponse: {
+        type: "object",
+        properties: {
+          query: { type: "string", example: "سباك في القاهرة" },
+          count: { type: "integer", example: 3 },
+          source: {
+            type: "string",
+            enum: ["recommender", "fallback"],
+            example: "recommender",
+          },
+          results: {
+            type: "array",
+            items: { $ref: "#/components/schemas/PostSearchResultItem" },
+          },
+        },
+        required: ["query", "count", "source", "results"],
+      },
+      SearchUsersRequest: {
+        type: "object",
+        required: ["query"],
+        properties: {
+          query: {
+            type: "string",
+            minLength: 1,
+            maxLength: 500,
+            example: "مطور React",
+          },
+          topK: {
+            type: "integer",
+            minimum: 1,
+            maximum: 50,
+            default: 20,
+            example: 20,
+          },
+        },
+      },
+      UserSearchCard: {
+        type: "object",
+        properties: {
+          id: { type: "integer", example: 1 },
+          username: { type: "string", example: "ahmed_dev" },
+          name: { type: "string", example: "Ahmed Zenaty" },
+          bio: { type: "string", nullable: true },
+          profilePicture: { type: "string", nullable: true },
+          location: { type: "string", nullable: true, example: "القاهرة" },
+          offeredSkills: {
+            type: "array",
+            items: { type: "string" },
+          },
+          requiredSkills: {
+            type: "array",
+            items: { type: "string" },
+          },
+        },
+        required: [
+          "id",
+          "username",
+          "name",
+          "bio",
+          "profilePicture",
+          "location",
+          "offeredSkills",
+          "requiredSkills",
+        ],
+      },
+      UserSearchResultItem: {
+        type: "object",
+        properties: {
+          user: { $ref: "#/components/schemas/UserSearchCard" },
+        },
+        required: ["user"],
+      },
+      UserSearchResponse: {
+        type: "object",
+        properties: {
+          query: { type: "string", example: "مطور React" },
+          count: { type: "integer", example: 2 },
+          source: {
+            type: "string",
+            enum: ["database"],
+            example: "database",
+          },
+          results: {
+            type: "array",
+            items: { $ref: "#/components/schemas/UserSearchResultItem" },
+          },
+        },
+        required: ["query", "count", "source", "results"],
       },
       CreatePostRequest: {
         type: "object",
