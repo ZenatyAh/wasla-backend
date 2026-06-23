@@ -22,27 +22,48 @@ const searchUserSelect = {
 } as const;
 
 export const searchUsersService = async (input: SearchUsersInput) => {
-  const { query, topK } = input;
+  const { query, topK, filters } = input;
 
-  const users = await prisma.user.findMany({
-    where: {
-      deleted_at: null,
-      OR: [
-        { full_name: { contains: query, mode: "insensitive" } },
-        { username: { contains: query, mode: "insensitive" } },
-        { bio: { contains: query, mode: "insensitive" } },
-        { location: { contains: query, mode: "insensitive" } },
-        {
-          skills: {
-            some: {
-              skill: {
-                name: { contains: query, mode: "insensitive" },
-              },
+  const whereClause: any = {
+    deleted_at: null,
+    OR: [
+      { full_name: { contains: query, mode: "insensitive" } },
+      { username: { contains: query, mode: "insensitive" } },
+      { bio: { contains: query, mode: "insensitive" } },
+      { location: { contains: query, mode: "insensitive" } },
+      {
+        skills: {
+          some: {
+            skill: {
+              name: { contains: query, mode: "insensitive" },
             },
           },
         },
-      ],
-    },
+      },
+    ],
+  };
+
+  if (filters) {
+    if (filters.isOnline !== undefined) {
+      whereClause.is_online = filters.isOnline;
+    }
+    if (filters.isVerified !== undefined) {
+      whereClause.is_verified = filters.isVerified;
+    }
+    if (filters.location) {
+      whereClause.location = { contains: filters.location, mode: "insensitive" };
+    }
+    if (filters.skillType) {
+      whereClause.skills = {
+        some: {
+          skill_type: filters.skillType,
+        },
+      };
+    }
+  }
+
+  const users = await prisma.user.findMany({
+    where: whereClause,
     orderBy: [{ full_name: "asc" }, { id: "asc" }],
     take: topK,
     select: searchUserSelect,

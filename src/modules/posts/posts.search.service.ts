@@ -22,15 +22,37 @@ const mapScores = (item: RecommenderSearchItem): SearchScores => ({
   finalScore: item.final_score,
 });
 
-const fallbackSearch = async (query: string, topK: number) => {
+const fallbackSearch = async (
+  query: string,
+  topK: number,
+  filters?: SearchPostsInput["filters"],
+) => {
+  const whereClause: any = {
+    status: "PUBLISHED",
+    OR: [
+      { title: { contains: query, mode: "insensitive" } },
+      { description: { contains: query, mode: "insensitive" } },
+    ],
+  };
+
+  if (filters) {
+    if (filters.category) whereClause.category = filters.category;
+    if (filters.serviceMode) whereClause.service_mode = filters.serviceMode;
+    if (filters.minCredits !== undefined || filters.maxCredits !== undefined) {
+      whereClause.assigned_time_credits = {
+        ...(filters.minCredits !== undefined ? { gte: filters.minCredits } : {}),
+        ...(filters.maxCredits !== undefined ? { lte: filters.maxCredits } : {}),
+      };
+    }
+    if (filters.location) {
+      whereClause.user = {
+        location: { contains: filters.location, mode: "insensitive" },
+      };
+    }
+  }
+
   const posts = await prisma.post.findMany({
-    where: {
-      status: "PUBLISHED",
-      OR: [
-        { title: { contains: query, mode: "insensitive" } },
-        { description: { contains: query, mode: "insensitive" } },
-      ],
-    },
+    where: whereClause,
     orderBy: [{ created_at: "desc" }, { id: "desc" }],
     take: topK,
     select: postSelect,
@@ -48,11 +70,15 @@ const fallbackSearch = async (query: string, topK: number) => {
 };
 
 export const searchPostsService = async (input: SearchPostsInput) => {
-  const { query, topK, threshold } = input;
+  const { query, topK, threshold, filters } = input;
 
   try {
+    // If filters are specified, request a larger page size from the recommender
+    // to ensure we have enough semantic candidates to filter in SQL.
+    const recommenderTopK = filters ? Math.max(100, topK * 5) : topK;
+
     const aiResponse = await fetchSearchResults(query, {
-      top_k: topK,
+      top_k: recommenderTopK,
       threshold,
     });
 
@@ -68,24 +94,67 @@ export const searchPostsService = async (input: SearchPostsInput) => {
       scoreByPostId.set(id, item);
     }
 
-    const hydrated = await hydratePublishedPostsById(orderedIds);
-    const results = hydrated.map((post) => {
-      const aiItem = scoreByPostId.get(post.id);
+    if (orderedIds.length === 0) {
       return {
-        post,
-        scores: aiItem ? mapScores(aiItem) : null,
+        query: aiResponse.query,
+        count: 0,
+        source: "recommender" as const,
+        results: [],
       };
+    }
+
+    const whereClause: any = {
+      id: { in: orderedIds },
+      status: "PUBLISHED",
+    };
+
+    if (filters) {
+      if (filters.category) whereClause.category = filters.category;
+      if (filters.serviceMode) whereClause.service_mode = filters.serviceMode;
+      if (filters.minCredits !== undefined || filters.maxCredits !== undefined) {
+        whereClause.assigned_time_credits = {
+          ...(filters.minCredits !== undefined ? { gte: filters.minCredits } : {}),
+          ...(filters.maxCredits !== undefined ? { lte: filters.maxCredits } : {}),
+        };
+      }
+      if (filters.location) {
+        whereClause.user = {
+          location: { contains: filters.location, mode: "insensitive" },
+        };
+      }
+    }
+
+    const posts = await prisma.post.findMany({
+      where: whereClause,
+      select: postSelect,
     });
+
+    const byId = new Map(
+      (posts as PostRecord[]).map((post) => [post.id, post]),
+    );
+
+    const results = orderedIds
+      .map((id) => byId.get(id))
+      .filter((post): post is PostRecord => Boolean(post))
+      .map((post) => {
+        const aiItem = scoreByPostId.get(post.id);
+        return {
+          post: toPostResponse(post),
+          scores: aiItem ? mapScores(aiItem) : null,
+        };
+      });
+
+    const finalResults = filters ? results.slice(0, topK) : results;
 
     return {
       query: aiResponse.query,
-      count: results.length,
+      count: finalResults.length,
       source: "recommender" as const,
-      results,
+      results: finalResults,
     };
   } catch (err: unknown) {
     if (err instanceof RecommenderUnavailableError) {
-      return fallbackSearch(query, topK);
+      return fallbackSearch(query, topK, filters);
     }
     throw err;
   }

@@ -8,8 +8,8 @@ export const openApiSpec = {
   },
   servers: [
     {
-      url: "http://localhost:3000",
-      description: "Local development server",
+      url: "https://wasla-backend.up.railway.app",
+      description: "Production server",
     },
   ],
   tags: [
@@ -2313,6 +2313,35 @@ export const openApiSpec = {
         },
         required: ["posts", "nextCursor", "source"],
       },
+      SearchPostsFilters: {
+        type: "object",
+        properties: {
+          category: {
+            type: "string",
+            enum: ["OFFER", "REQUEST"],
+            example: "OFFER",
+          },
+          serviceMode: {
+            type: "string",
+            enum: ["ONLINE", "OFFLINE"],
+            example: "ONLINE",
+          },
+          minCredits: {
+            type: "integer",
+            minimum: 0,
+            example: 5,
+          },
+          maxCredits: {
+            type: "integer",
+            minimum: 0,
+            example: 20,
+          },
+          location: {
+            type: "string",
+            example: "القاهرة",
+          },
+        },
+      },
       SearchPostsRequest: {
         type: "object",
         required: ["query"],
@@ -2337,6 +2366,9 @@ export const openApiSpec = {
             example: 0.5,
             description:
               "Minimum similarity score (0–1). Only sent to the recommender when provided.",
+          },
+          filters: {
+            $ref: "#/components/schemas/SearchPostsFilters",
           },
         },
       },
@@ -2387,6 +2419,28 @@ export const openApiSpec = {
         },
         required: ["query", "count", "source", "results"],
       },
+      SearchUsersFilters: {
+        type: "object",
+        properties: {
+          skillType: {
+            type: "string",
+            enum: ["OFFER", "REQUEST"],
+            example: "OFFER",
+          },
+          location: {
+            type: "string",
+            example: "الإسكندرية",
+          },
+          isOnline: {
+            type: "boolean",
+            example: true,
+          },
+          isVerified: {
+            type: "boolean",
+            example: true,
+          },
+        },
+      },
       SearchUsersRequest: {
         type: "object",
         required: ["query"],
@@ -2403,6 +2457,9 @@ export const openApiSpec = {
             maximum: 50,
             default: 20,
             example: 20,
+          },
+          filters: {
+            $ref: "#/components/schemas/SearchUsersFilters",
           },
         },
       },
