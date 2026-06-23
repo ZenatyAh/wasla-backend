@@ -23,6 +23,7 @@ if (!hasTestDatabase) {
 
   let userId = 0;
   let token = "";
+  const createdPostIds: number[] = [];
 
   describe("Posts API", () => {
     before(async () => {
@@ -39,11 +40,57 @@ if (!hasTestDatabase) {
 
       userId = user.id;
       token = signAccessToken(String(userId));
+
+      for (let index = 0; index < 3; index += 1) {
+        const post = await prisma.post.create({
+          data: {
+            user_id: userId,
+            title: `Pagination test post ${index}`,
+            description: `Pagination test description ${index}`,
+            category: "OFFER",
+            service_mode: "ONLINE",
+            assigned_time_credits: 5,
+            status: "PUBLISHED",
+          },
+        });
+        createdPostIds.push(post.id);
+      }
     });
 
     after(async () => {
+      await prisma.post.deleteMany({ where: { id: { in: createdPostIds } } });
       await prisma.user.deleteMany({ where: { id: userId } });
       await prisma.$disconnect();
+    });
+
+    it("paginates published posts", async () => {
+      const firstPage = await request(app).get("/posts?limit=2");
+
+      assert.equal(firstPage.status, 200);
+      assert.equal(firstPage.body.posts.length, 2);
+      assert.ok(firstPage.body.nextCursor);
+
+      const secondPage = await request(app).get(
+        `/posts?limit=2&cursor=${firstPage.body.nextCursor}`,
+      );
+
+      assert.equal(secondPage.status, 200);
+      assert.ok(secondPage.body.posts.length >= 1);
+      assert.notEqual(
+        secondPage.body.posts[0]?.id,
+        firstPage.body.posts[0]?.id,
+      );
+    });
+
+    it("paginates my posts for the authenticated user", async () => {
+      const response = await request(app)
+        .get("/posts/me?limit=2")
+        .set({ Authorization: `Bearer ${token}` });
+
+      assert.equal(response.status, 200);
+      assert.equal(response.body.posts.length, 2);
+      assert.ok(response.body.nextCursor);
+      assert.equal(response.body.posts[0]?.userId, userId);
     });
 
     it("returns 404 when deleting a non-existent post", async () => {

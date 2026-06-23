@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import {createPostService,deletePostService,getPostByIdService,listMyPostsService,listPublishedPostsService,listSavedPostsService,savePostService,unsavePostService,updatePostService,} from "./posts.service.js";
 import type { CreatePostInput, UpdatePostInput } from "./posts.schema.js";
+import { listPostsQuerySchema } from "./posts.schema.js";
 import { getErrorMessage, sendError } from "../../common/utils/httpError.js";
 
 const postIdSchema = z.coerce.number().int().positive();
@@ -30,11 +31,15 @@ export const createPostController = async (req: Request, res: Response) => {
   }
 };
 
-export const listPublishedPostsController = async (_req: Request,res: Response) => {
+export const listPublishedPostsController = async (req: Request,res: Response) => {
   try {
-    const posts = await listPublishedPostsService()
-    return res.json({ posts })
+    const query = listPostsQuerySchema.parse(req.query)
+    const result = await listPublishedPostsService(query)
+    return res.json(result)
   } catch (err: unknown) {
+    if (err instanceof z.ZodError) {
+      return sendError(res, 400, "Invalid request data")
+    }
     return sendError(res, 400, getErrorMessage(err, "Fetch posts failed"))
   }
 };
@@ -61,9 +66,13 @@ export const listMyPostsController = async (req: Request, res: Response) => {
       return sendError(res, 401, "Unauthorized")
     }
 
-    const posts = await listMyPostsService(userId);
-    return res.json({ posts });
+    const query = listPostsQuerySchema.parse(req.query)
+    const result = await listMyPostsService(userId, query);
+    return res.json(result);
   } catch (err: unknown) {
+    if (err instanceof z.ZodError) {
+      return sendError(res, 400, "Invalid request data")
+    }
     return sendError(res, 400, getErrorMessage(err, "Fetch posts failed"));
   }
 };
@@ -145,9 +154,13 @@ export const listSavedPostsController = async (req: Request, res: Response) => {
       return sendError(res, 401, "Unauthorized");
     }
 
-    const savedPosts = await listSavedPostsService(userId);
-    return res.json({ savedPosts });
+    const query = listPostsQuerySchema.parse(req.query)
+    const result = await listSavedPostsService(userId, query);
+    return res.json(result);
   } catch (err: unknown) {
+    if (err instanceof z.ZodError) {
+      return sendError(res, 400, "Invalid request data")
+    }
     return sendError(res, 400, getErrorMessage(err, "Fetch saved posts failed"));
   }
 };

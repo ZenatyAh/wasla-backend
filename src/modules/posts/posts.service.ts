@@ -3,8 +3,17 @@ import {
     syncInteraction,
     syncPost,
 } from "../recommender/recommender.client.js";
-import type { CreatePostInput, UpdatePostInput } from "./posts.schema.js";
+import type {
+    CreatePostInput,
+    ListPostsQuery,
+    UpdatePostInput,
+} from "./posts.schema.js";
 import { postSelect, toPostResponse } from "./posts.mapper.js";
+import {
+    buildPostCursorFilter,
+    buildSavedPostCursorFilter,
+    paginateById,
+} from "./posts.pagination.js";
 
 type SavedPostRecord = {
     id: number
@@ -48,22 +57,43 @@ export const createPostService = async (data: CreatePostInput,userId: number) =>
     return toPostResponse(post)
 }
 
-export const listPublishedPostsService = async () => {
+export const listPublishedPostsService = async (query: ListPostsQuery) => {
+    const limit = query.limit ?? 20
+    const cursorFilter = await buildPostCursorFilter(query.cursor)
+
     const posts = await prisma.post.findMany({
-        where: { status: "PUBLISHED" },
-        orderBy: { created_at: "desc" },
+        where: { status: "PUBLISHED", ...cursorFilter },
+        orderBy: [{ created_at: "desc" }, { id: "desc" }],
+        take: limit + 1,
         select: postSelect,
     })
-    return posts.map(toPostResponse)
+
+    const { items, nextCursor } = paginateById(posts, limit)
+    return {
+        posts: items.map(toPostResponse),
+        nextCursor,
+    }
 }
 
-export const listMyPostsService = async (userId: number) => {
+export const listMyPostsService = async (
+    userId: number,
+    query: ListPostsQuery,
+) => {
+    const limit = query.limit ?? 20
+    const cursorFilter = await buildPostCursorFilter(query.cursor)
+
     const posts = await prisma.post.findMany({
-        where: { user_id: userId },
-        orderBy: { created_at: "desc" },
+        where: { user_id: userId, ...cursorFilter },
+        orderBy: [{ created_at: "desc" }, { id: "desc" }],
+        take: limit + 1,
         select: postSelect,
     })
-    return posts.map(toPostResponse)
+
+    const { items, nextCursor } = paginateById(posts, limit)
+    return {
+        posts: items.map(toPostResponse),
+        nextCursor,
+    }
 }
 
 export const getPostByIdService = async (postId: number, userId: number) => {
@@ -164,13 +194,21 @@ export const unsavePostService = async (postId: number, userId: number) => {
     })
 }
 
-export const listSavedPostsService = async (userId: number) => {
+export const listSavedPostsService = async (
+    userId: number,
+    query: ListPostsQuery,
+) => {
+    const limit = query.limit ?? 20
+    const cursorFilter = await buildSavedPostCursorFilter(query.cursor)
+
     const savedPosts = await prisma.savedPost.findMany({
         where: {
             user_id: userId,
             post: { status: "PUBLISHED" },
+            ...cursorFilter,
         },
-        orderBy: { created_at: "desc" },
+        orderBy: [{ created_at: "desc" }, { id: "desc" }],
+        take: limit + 1,
         select: {
             id: true,
             user_id: true,
@@ -178,11 +216,16 @@ export const listSavedPostsService = async (userId: number) => {
             created_at: true,
             post: {
                 select: postSelect,
-            }
+            },
         },
     })
-    return savedPosts.map((savedPost) => ({
-        ...toSavedPostResponse(savedPost),
-        post: toPostResponse(savedPost.post),
-    }))
+
+    const { items, nextCursor } = paginateById(savedPosts, limit)
+    return {
+        savedPosts: items.map((savedPost) => ({
+            ...toSavedPostResponse(savedPost),
+            post: toPostResponse(savedPost.post),
+        })),
+        nextCursor,
+    }
 }

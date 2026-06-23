@@ -19,5 +19,11 @@ export const updatePostSchema = createPostSchema
         message: "At least one field is required",
     })
 
+export const listPostsQuerySchema = z.object({
+    cursor: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+})
+
 export type CreatePostInput = z.infer<typeof createPostSchema>
 export type UpdatePostInput = z.infer<typeof updatePostSchema>
+export type ListPostsQuery = z.infer<typeof listPostsQuerySchema>

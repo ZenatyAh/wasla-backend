@@ -549,24 +549,23 @@ export const openApiSpec = {
       },
       get: {
         tags: ["Posts"],
-        summary: "List all published posts",
-        description: "Retrieve all published posts from the system. No authentication required.",
+        summary: "List published posts",
+        description:
+          "Retrieve published posts with cursor-based pagination. No authentication required.",
+        parameters: [
+          { name: "cursor", in: "query", schema: { type: "integer" } },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", default: 20, maximum: 50 },
+          },
+        ],
         responses: {
           "200": {
-            description: "List of published posts",
+            description: "Paginated list of published posts",
             content: {
               "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    posts: {
-                      type: "array",
-                      items: {
-                        $ref: "#/components/schemas/Post",
-                      },
-                    },
-                  },
-                },
+                schema: { $ref: "#/components/schemas/PostListResponse" },
               },
             },
           },
@@ -580,24 +579,23 @@ export const openApiSpec = {
       get: {
         tags: ["Posts"],
         summary: "List my posts",
-        description: "Retrieve all posts created by the authenticated user.",
+        description:
+          "Retrieve posts created by the authenticated user with cursor-based pagination.",
         security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "cursor", in: "query", schema: { type: "integer" } },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", default: 20, maximum: 50 },
+          },
+        ],
         responses: {
           "200": {
-            description: "List of user's posts",
+            description: "Paginated list of user's posts",
             content: {
               "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    posts: {
-                      type: "array",
-                      items: {
-                        $ref: "#/components/schemas/Post",
-                      },
-                    },
-                  },
-                },
+                schema: { $ref: "#/components/schemas/PostListResponse" },
               },
             },
           },
@@ -614,24 +612,23 @@ export const openApiSpec = {
       get: {
         tags: ["Posts"],
         summary: "List saved posts",
-        description: "Retrieve all posts saved by the authenticated user.",
+        description:
+          "Retrieve posts saved by the authenticated user with cursor-based pagination.",
         security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "cursor", in: "query", schema: { type: "integer" } },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", default: 20, maximum: 50 },
+          },
+        ],
         responses: {
           "200": {
-            description: "List of saved posts",
+            description: "Paginated list of saved posts",
             content: {
               "application/json": {
-                schema: {
-                  type: "object",
-                  properties: {
-                    savedPosts: {
-                      type: "array",
-                      items: {
-                        $ref: "#/components/schemas/SavedPost",
-                      },
-                    },
-                  },
-                },
+                schema: { $ref: "#/components/schemas/SavedPostListResponse" },
               },
             },
           },
@@ -1968,6 +1965,12 @@ export const openApiSpec = {
             schema: { type: "integer" },
             example: 1,
           },
+          { name: "cursor", in: "query", schema: { type: "integer" } },
+          {
+            name: "limit",
+            in: "query",
+            schema: { type: "integer", default: 20, maximum: 50 },
+          },
         ],
         responses: {
           "200": {
@@ -2204,6 +2207,28 @@ export const openApiSpec = {
           post: { $ref: "#/components/schemas/Post" },
         },
         required: ["post"],
+      },
+      PostListResponse: {
+        type: "object",
+        properties: {
+          posts: {
+            type: "array",
+            items: { $ref: "#/components/schemas/Post" },
+          },
+          nextCursor: { type: "integer", nullable: true },
+        },
+        required: ["posts", "nextCursor"],
+      },
+      SavedPostListResponse: {
+        type: "object",
+        properties: {
+          savedPosts: {
+            type: "array",
+            items: { $ref: "#/components/schemas/SavedPost" },
+          },
+          nextCursor: { type: "integer", nullable: true },
+        },
+        required: ["savedPosts", "nextCursor"],
       },
       FeedResponse: {
         type: "object",
