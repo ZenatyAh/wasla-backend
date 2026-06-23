@@ -5,6 +5,7 @@ import {
   RECOMMENDER_URL,
 } from "../../common/utils/env.js";
 import { prisma } from "../../lib/prisma.js";
+import { buildRecommenderExport } from "./recommender.export.service.js";
 import {
   mapInteraction,
   mapPost,
@@ -25,7 +26,7 @@ const skillInclude = {
   },
 } as const;
 
-type RecommendItem = { post_id: string; score?: number };
+type RecommendItem = { post_id: string; score?: number; final_score?: number };
 type RecommendResponse = { recommendations: RecommendItem[] };
 
 class RecommenderUnavailableError extends Error {
@@ -138,11 +139,15 @@ const loadUserForSync = async (
 };
 
 /**
- * POST /sync/bootstrap — rebuild the recommender index from Express export.
- * Used when a post is deleted or unpublished (no per-post delete endpoint).
+ * POST /sync/bootstrap — rebuild the recommender index from a full Express
+ * snapshot. Sends the export inline so the AI does not need to pull Express
+ * itself (EXPRESS_INTERNAL_URL on the recommender side is optional then).
  */
 export const syncBootstrapRebuild = (): void => {
-  fireAndForget("bootstrap", () => request("POST", "/sync/bootstrap", {}));
+  fireAndForget("bootstrap", async () => {
+    const payload = await buildRecommenderExport();
+    await request("POST", "/sync/bootstrap", payload);
+  });
 };
 
 /** POST /sync/post — after a published post is created or updated. */
