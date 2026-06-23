@@ -2237,13 +2237,14 @@ export const openApiSpec = {
             type: "array",
             items: { $ref: "#/components/schemas/Post" },
           },
+          nextCursor: { type: "integer", nullable: true },
           source: {
             type: "string",
             enum: ["recommender", "fallback"],
             example: "recommender",
           },
         },
-        required: ["posts", "source"],
+        required: ["posts", "nextCursor", "source"],
       },
       CreatePostRequest: {
         type: "object",

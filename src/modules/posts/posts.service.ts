@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import {
+    syncBootstrapRebuild,
     syncInteraction,
     syncPost,
 } from "../recommender/recommender.client.js";
@@ -127,7 +128,11 @@ export const updatePostService = async (postId: number,userId: number,data: Upda
         data: buildPostUpdateData(data),
         select: postSelect,
     }).then((updated) => {
-        syncPost(updated.id)
+        if (updated.status === "PUBLISHED") {
+            syncPost(updated.id)
+        } else {
+            syncBootstrapRebuild()
+        }
         return toPostResponse(updated)
     })
 }
@@ -145,6 +150,7 @@ export const deletePostService = async (postId: number, userId: number) => {
     }
 
     await prisma.post.delete({ where: { id: postId } })
+    syncBootstrapRebuild()
 }
 
 export const savePostService = async (postId: number, userId: number) => {
@@ -192,6 +198,7 @@ export const unsavePostService = async (postId: number, userId: number) => {
             },
         },
     })
+    syncInteraction({ userId, postId, action: "unsave" })
 }
 
 export const listSavedPostsService = async (

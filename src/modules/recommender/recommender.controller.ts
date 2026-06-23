@@ -8,7 +8,10 @@ import {
   type PostRecord,
 } from "../posts/posts.mapper.js";
 import { listPostsQuerySchema } from "../posts/posts.schema.js";
-import { buildPostCursorFilter } from "../posts/posts.pagination.js";
+import {
+  buildPostCursorFilter,
+  paginateById,
+} from "../posts/posts.pagination.js";
 import {
   fetchRecommendedPostIds,
   RecommenderUnavailableError,
@@ -16,6 +19,7 @@ import {
 import { buildRecommenderExport } from "./recommender.export.service.js";
 
 const userIdSchema = z.coerce.number().int().positive();
+const RECOMMENDER_PAGE_FETCH_CAP = 200;
 
 /**
  * GET /internal/recommender-export
@@ -42,15 +46,24 @@ export const recommenderExportController = async (
  */
 const mapFeedPosts = (posts: PostRecord[]) => posts.map(toPostResponse);
 
-const chronologicalFeed = async (limit: number, cursor?: number) => {
+type FeedPage = {
+  posts: ReturnType<typeof mapFeedPosts>;
+  nextCursor: number | null;
+};
+
+const chronologicalFeed = async (
+  limit: number,
+  cursor?: number,
+): Promise<FeedPage> => {
   const cursorFilter = await buildPostCursorFilter(cursor);
-  const posts = await prisma.post.findMany({
+  const rows = await prisma.post.findMany({
     where: { status: "PUBLISHED", ...cursorFilter },
     orderBy: [{ created_at: "desc" }, { id: "desc" }],
-    take: limit,
+    take: limit + 1,
     select: postSelect,
   });
-  return mapFeedPosts(posts as PostRecord[]);
+  const { items, nextCursor } = paginateById(rows as PostRecord[], limit);
+  return { posts: mapFeedPosts(items), nextCursor };
 };
 
 const hydrateFeedPosts = async (order: number[]) => {
@@ -66,6 +79,43 @@ const hydrateFeedPosts = async (order: number[]) => {
     .filter((post): post is PostRecord => Boolean(post));
   return mapFeedPosts(ordered);
 };
+
+const recommendedFeed = async (
+  userId: number,
+  limit: number,
+  cursor?: number,
+): Promise<FeedPage | null> => {
+  const order = await fetchRecommendedPostIds(userId, RECOMMENDER_PAGE_FETCH_CAP);
+
+  let startIndex = 0;
+  if (cursor) {
+    const cursorIndex = order.indexOf(cursor);
+    if (cursorIndex !== -1) {
+      startIndex = cursorIndex + 1;
+    }
+  }
+
+  const pageIds = order.slice(startIndex, startIndex + limit + 1);
+  const { items, nextCursor } = paginateById(
+    pageIds.map((id) => ({ id })),
+    limit,
+  );
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return {
+    posts: await hydrateFeedPosts(items.map((item) => item.id)),
+    nextCursor,
+  };
+};
+
+const feedResponse = (page: FeedPage, source: "recommender" | "fallback") => ({
+  posts: page.posts,
+  nextCursor: page.nextCursor,
+  source,
+});
 
 export const feedController = async (req: Request, res: Response) => {
   let userId: number;
@@ -85,25 +135,20 @@ export const feedController = async (req: Request, res: Response) => {
   const limit = query.limit ?? 20;
 
   try {
-    const order = await fetchRecommendedPostIds(userId, limit);
+    const page = await recommendedFeed(userId, limit, query.cursor);
 
-    if (order.length === 0) {
-      return res.json({
-        posts: await chronologicalFeed(limit, query.cursor),
-        source: "fallback",
-      });
+    if (!page) {
+      return res.json(
+        feedResponse(await chronologicalFeed(limit, query.cursor), "fallback"),
+      );
     }
 
-    return res.json({
-      posts: await hydrateFeedPosts(order),
-      source: "recommender",
-    });
+    return res.json(feedResponse(page, "recommender"));
   } catch (err: unknown) {
     if (err instanceof RecommenderUnavailableError) {
-      return res.json({
-        posts: await chronologicalFeed(limit, query.cursor),
-        source: "fallback",
-      });
+      return res.json(
+        feedResponse(await chronologicalFeed(limit, query.cursor), "fallback"),
+      );
     }
     return sendError(res, 500, getErrorMessage(err, "Feed failed"));
   }

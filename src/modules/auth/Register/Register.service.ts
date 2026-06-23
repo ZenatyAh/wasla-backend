@@ -2,6 +2,7 @@ import { prisma } from "../../../lib/prisma.js";
 import bcrypt from "bcrypt";
 import { createSession } from "./create_session.js";
 import type { RegisterInput } from "../auth.schema.js";
+import { syncUser } from "../../recommender/recommender.client.js";
 import { syncUserSkillsByType } from "../../skills/userSkills.service.js";
 
 export const RegisterService = async (
@@ -70,6 +71,7 @@ export const RegisterService = async (
   },{timeout: 15000});
 
   const { refreshToken, accessToken } = await createSession(user.id, meta);
+  syncUser(user.id);
   return {
     id: user.id,
     email: user.email,

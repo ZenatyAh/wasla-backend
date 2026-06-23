@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "ServiceExchangeStatus" AS ENUM ('PENDING', 'ACTIVE', 'COMPLETED', 'CANCELLED');
+CREATE TYPE "ServiceExchangeStatus" AS ENUM ('PENDING', 'ACCEPTED', 'IN_PROGRESS', 'WAITING_CONFIRMATION', 'COMPLETED', 'CANCELED', 'REJECTED', 'DISPUTED');
 
 -- CreateTable
 CREATE TABLE "service_exchanges" (
@@ -9,7 +9,11 @@ CREATE TABLE "service_exchanges" (
     "consumer_id" INTEGER NOT NULL,
     "time_credits" INTEGER NOT NULL,
     "status" "ServiceExchangeStatus" NOT NULL DEFAULT 'PENDING',
+    "escrow_status" "EscrowStatus" NOT NULL DEFAULT 'NONE',
+    "accepted_at" TIMESTAMP(3),
+    "delivered_at" TIMESTAMP(3),
     "completed_at" TIMESTAMP(3),
+    "canceled_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 

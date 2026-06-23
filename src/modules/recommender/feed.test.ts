@@ -71,6 +71,10 @@ if (!hasTestDatabase) {
       assert.ok(["recommender", "fallback"].includes(response.body.source));
       assert.ok(Array.isArray(response.body.posts));
       assert.ok(response.body.posts.length >= 1);
+      assert.ok(
+        response.body.nextCursor === null ||
+          typeof response.body.nextCursor === "number",
+      );
 
       const post = response.body.posts.find(
         (item: { id: number }) => item.id === postId,
