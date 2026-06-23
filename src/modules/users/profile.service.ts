@@ -5,13 +5,20 @@ import { syncUserSkillsByType } from "../skills/userSkills.service.js";
 import type { UpdateProfileInput } from "./profile.schema.js";
 import {
   toBasicProfile,
+  toProfileSkills,
   toRecentExchange,
   toUpdatableProfile,
 } from "./profile.mapper.js";
 
 export const getUserProfile = async (userId: number) => {
-  const [user, providedCount, receivedCount, ratingAgg, recentExchanges] =
-    await Promise.all([
+  const [
+    user,
+    providedCount,
+    receivedCount,
+    ratingAgg,
+    recentExchanges,
+    userSkills,
+  ] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -61,6 +68,14 @@ export const getUserProfile = async (userId: number) => {
           },
         },
       }),
+      prisma.userSkill.findMany({
+        where: { user_id: userId },
+        select: {
+          skill_type: true,
+          skill: { select: { name: true } },
+        },
+        orderBy: { created_at: "asc" },
+      }),
     ]);
 
   if (!user || user.deleted_at) {
@@ -72,6 +87,7 @@ export const getUserProfile = async (userId: number) => {
   return {
     profile: {
       ...toBasicProfile(user),
+      ...toProfileSkills(userSkills),
       stats: {
         availableTimeCredits: user.available_balance,
         servicesProvided: providedCount,

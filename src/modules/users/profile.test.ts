@@ -169,6 +169,12 @@ if (!hasTestDatabase) {
       assert.equal(response.status, 200);
       assert.equal(response.body.profile.name, "Profile Provider");
       assert.equal(response.body.profile.username, `profile_provider_${runId}`);
+      assert.deepEqual(response.body.profile.offeredSkills, [
+        `Profile Offer Skill ${runId}`,
+      ]);
+      assert.deepEqual(response.body.profile.requiredSkills, [
+        `Profile Request Skill ${runId}`,
+      ]);
       assert.equal(response.body.profile.stats.availableTimeCredits, 10);
       assert.equal(response.body.profile.stats.servicesProvided, 1);
       assert.equal(response.body.profile.stats.servicesReceived, 0);
