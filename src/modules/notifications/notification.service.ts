@@ -1,4 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
+import { type NotificationType } from "../../generated/prisma/client.js";
 import { sendMessageEmail } from "../../common/utils/sendMessageEmail.js";
 import { ChatError } from "../chat/chat.errors.js";
 import type { ListNotificationsQuery } from "./notification.schema.js";
@@ -56,6 +57,26 @@ export const createMessageNotification = async (input: {
   } catch {
     // Email failures must not block in-app notifications.
   }
+
+  return toNotificationResponse(notification);
+};
+
+export const createContractNotification = async (input: {
+  recipientId: number;
+  type: NotificationType;
+  title: string;
+  body: string;
+  contractId: number;
+}) => {
+  const notification = await prisma.notification.create({
+    data: {
+      userId: input.recipientId,
+      type: input.type,
+      title: input.title,
+      body: input.body,
+      data: { contractId: input.contractId },
+    },
+  });
 
   return toNotificationResponse(notification);
 };

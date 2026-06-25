@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import { syncInteraction } from "../recommender/recommender.client.js";
+import { createContractNotification } from "../notifications/notification.service.js";
 import { ExchangeError } from "./exchanges.errors.js";
 import type { CreateExchangeInput, ListExchangesQuery, CreateSessionInput, DeadlineExtensionInput } from "./exchanges.schema.js";
 
@@ -183,6 +184,14 @@ export const requestExchange = async (
     action: "apply",
   });
 
+  await createContractNotification({
+    recipientId: data.providerId,
+    type: "EXCHANGE_REQUESTED",
+    title: "طلب خدمة جديد",
+    body: "هناك شخص يطلب إحدى خدماتك، يرجى مراجعة الطلب.",
+    contractId: exchange.id,
+  }).catch((err) => console.error("Notification failed", err));
+
   return toExchangeResponse(exchange as ExchangeRecord);
 };
 
@@ -240,7 +249,17 @@ export const acceptExchange = async (id: number, providerId: number) => {
     }
   });
 
-  return fetchExchange(id);
+  const result = await fetchExchange(id);
+
+  await createContractNotification({
+    recipientId: result.requesterId,
+    type: "EXCHANGE_ACCEPTED",
+    title: "تم قبول طلبك",
+    body: "تم قبول طلب الخدمة الخاص بك، وهو الآن قيد التنفيذ.",
+    contractId: result.id,
+  }).catch((err) => console.error("Notification failed", err));
+
+  return result;
 };
 
 export const rejectExchange = async (id: number, providerId: number) => {
@@ -257,7 +276,17 @@ export const rejectExchange = async (id: number, providerId: number) => {
     data: { status: "REJECTED" },
   });
 
-  return fetchExchange(id);
+  const result = await fetchExchange(id);
+
+  await createContractNotification({
+    recipientId: result.requesterId,
+    type: "EXCHANGE_REJECTED",
+    title: "تم رفض طلبك",
+    body: "تم رفض طلب الخدمة الخاص بك.",
+    contractId: result.id,
+  }).catch((err) => console.error("Notification failed", err));
+
+  return result;
 };
 
 export const deliverExchange = async (id: number, providerId: number) => {
@@ -452,7 +481,18 @@ export const cancelExchange = async (id: number, userId: number) => {
     );
   });
 
-  return fetchExchange(id);
+  const result = await fetchExchange(id);
+
+  const recipientId = userId === result.providerId ? result.requesterId : result.providerId;
+  await createContractNotification({
+    recipientId,
+    type: "EXCHANGE_CANCELED",
+    title: "تم إلغاء الطلب",
+    body: "تم إلغاء طلب الخدمة.",
+    contractId: result.id,
+  }).catch((err) => console.error("Notification failed", err));
+
+  return result;
 };
 
 export const disputeExchange = async (id: number, userId: number) => {
@@ -539,7 +579,7 @@ export const recordWorkSession = async (
   providerId: number,
   data: CreateSessionInput,
 ) => {
-  return await runSerializable(async (tx) => {
+  const result = await runSerializable(async (tx) => {
     const exchange = await tx.serviceExchange.findUnique({
       where: { id: contractId },
       select: { id: true, provider_id: true, status: true, time_credits: true, completed_hours: true },
@@ -583,6 +623,19 @@ export const recordWorkSession = async (
     });
     return session;
   });
+
+  const exchange = await prisma.serviceExchange.findUnique({ where: { id: contractId } });
+  if (exchange) {
+    await createContractNotification({
+      recipientId: exchange.consumer_id,
+      type: "SESSION_RECORDED",
+      title: "تم تسجيل جلسة عمل جديدة",
+      body: "قام مقدم الخدمة بتسجيل جلسة عمل جديدة، يرجى مراجعتها.",
+      contractId: exchange.id,
+    }).catch((err) => console.error("Notification failed", err));
+  }
+
+  return result;
 };
 
 export const confirmWorkSession = async (
@@ -590,7 +643,7 @@ export const confirmWorkSession = async (
   sessionId: number,
   requesterId: number,
 ) => {
-  return await runSerializable(async (tx) => {
+  const result = await runSerializable(async (tx) => {
     const exchange = await tx.serviceExchange.findUnique({
       where: { id: contractId },
       select: { id: true, consumer_id: true, provider_id: true, time_credits: true, completed_hours: true, status: true },
@@ -671,6 +724,19 @@ export const confirmWorkSession = async (
 
     return updatedSession;
   });
+
+  const exchange = await prisma.serviceExchange.findUnique({ where: { id: contractId } });
+  if (exchange) {
+    await createContractNotification({
+      recipientId: exchange.provider_id,
+      type: "SESSION_CONFIRMED",
+      title: "تم تأكيد جلسة العمل",
+      body: "قام طالب الخدمة بتأكيد جلسة العمل الخاصة بك.",
+      contractId: exchange.id,
+    }).catch((err) => console.error("Notification failed", err));
+  }
+
+  return result;
 };
 
 export const rejectWorkSession = async (
@@ -680,7 +746,7 @@ export const rejectWorkSession = async (
 ) => {
   const exchange = await prisma.serviceExchange.findUnique({
     where: { id: contractId },
-    select: { id: true, consumer_id: true },
+    select: { id: true, consumer_id: true, provider_id: true },
   });
 
   if (!exchange) {
@@ -701,10 +767,20 @@ export const rejectWorkSession = async (
     throw new ExchangeError("Session is not pending confirmation", 400);
   }
 
-  return await prisma.workSession.update({
+  const result = await prisma.workSession.update({
     where: { id: sessionId },
     data: { status: "REJECTED" },
   });
+
+  await createContractNotification({
+    recipientId: exchange.provider_id,
+    type: "SESSION_REJECTED",
+    title: "تم رفض جلسة العمل",
+    body: "قام طالب الخدمة برفض جلسة العمل الخاصة بك.",
+    contractId: exchange.id,
+  }).catch((err) => console.error("Notification failed", err));
+
+  return result;
 };
 
 export const listWorkSessions = async (contractId: number, userId: number) => {
@@ -741,11 +817,21 @@ export const proposeDeadlineExtension = async (
     throw new ExchangeError("Cannot extend a contract that is not active", 400);
   }
 
-  return await prisma.serviceExchange.update({
+  const result = await prisma.serviceExchange.update({
     where: { id: contractId },
     data: { proposed_end_date: data.proposedEndDate },
     select: exchangeSelect,
   });
+
+  await createContractNotification({
+    recipientId: exchange.consumer_id,
+    type: "DEADLINE_PROPOSED",
+    title: "تم اقتراح موعد تسليم جديد",
+    body: "قام مقدم الخدمة باقتراح موعد تسليم جديد، يرجى مراجعته.",
+    contractId: exchange.id,
+  }).catch((err) => console.error("Notification failed", err));
+
+  return result;
 };
 
 export const approveDeadlineExtension = async (contractId: number, consumerId: number) => {
@@ -757,7 +843,7 @@ export const approveDeadlineExtension = async (contractId: number, consumerId: n
   if (exchange.consumer_id !== consumerId) throw new ExchangeError("Only the consumer can approve an extension", 403);
   if (!exchange.proposed_end_date) throw new ExchangeError("No deadline extension proposed", 400);
 
-  return await prisma.serviceExchange.update({
+  const result = await prisma.serviceExchange.update({
     where: { id: contractId },
     data: {
       maximum_end_date: exchange.proposed_end_date,
@@ -765,6 +851,16 @@ export const approveDeadlineExtension = async (contractId: number, consumerId: n
     },
     select: exchangeSelect,
   });
+
+  await createContractNotification({
+    recipientId: exchange.provider_id,
+    type: "DEADLINE_APPROVED",
+    title: "تم الموافقة على الموعد الجديد",
+    body: "تم الموافقة على موعد التسليم الجديد.",
+    contractId: exchange.id,
+  }).catch((err) => console.error("Notification failed", err));
+
+  return result;
 };
 
 export const rejectDeadlineExtension = async (contractId: number, consumerId: number) => {
@@ -776,11 +872,21 @@ export const rejectDeadlineExtension = async (contractId: number, consumerId: nu
   if (exchange.consumer_id !== consumerId) throw new ExchangeError("Only the consumer can reject an extension", 403);
   if (!exchange.proposed_end_date) throw new ExchangeError("No deadline extension proposed", 400);
 
-  return await prisma.serviceExchange.update({
+  const result = await prisma.serviceExchange.update({
     where: { id: contractId },
     data: { proposed_end_date: null },
     select: exchangeSelect,
   });
+
+  await createContractNotification({
+    recipientId: exchange.provider_id,
+    type: "DEADLINE_REJECTED",
+    title: "تم رفض الموعد المقترح",
+    body: "تم رفض موعد التسليم الجديد المقترح.",
+    contractId: exchange.id,
+  }).catch((err) => console.error("Notification failed", err));
+
+  return result;
 };
 
 export const resolveExpiredContracts = async () => {
@@ -858,6 +964,23 @@ export const resolveExpiredContracts = async () => {
           },
         });
       });
+
+      await createContractNotification({
+        recipientId: contract.provider_id,
+        type: "CONTRACT_AUTO_RESOLVED",
+        title: "تم إنهاء العقد تلقائياً",
+        body: "تم إنهاء العقد تلقائياً لانتهاء المدة المتفق عليها.",
+        contractId: contract.id,
+      }).catch((err) => console.error("Notification failed", err));
+
+      await createContractNotification({
+        recipientId: contract.consumer_id,
+        type: "CONTRACT_AUTO_RESOLVED",
+        title: "تم إنهاء العقد تلقائياً",
+        body: "تم إنهاء العقد تلقائياً لانتهاء المدة المتفق عليها.",
+        contractId: contract.id,
+      }).catch((err) => console.error("Notification failed", err));
+
       resolvedCount++;
     } catch (error) {
       console.error(`Failed to resolve expired contract ${contract.id}:`, error);
