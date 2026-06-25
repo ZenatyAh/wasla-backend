@@ -9,21 +9,21 @@ datasource db {
 }
 
 model User {
-  id                    Int                  @id @default(autoincrement())
+  id                    Int                       @id @default(autoincrement())
   full_name             String
-  username              String               @unique
-  email                 String               @unique
+  username              String                    @unique
+  email                 String                    @unique
   password_hash         String
   bio                   String?
   profile_image         String?
-  available_balance     Int                  @default(5)
-  escrow_balance        Int                  @default(0)
-  services_provided     Int                  @default(0)
-  services_received     Int                  @default(0)
-  created_at            DateTime             @default(now())
-  updated_at            DateTime             @updatedAt
-  is_verified           Boolean              @default(false)
-  is_online             Boolean              @default(false)
+  available_balance     Int                       @default(5)
+  escrow_balance        Int                       @default(0)
+  services_provided     Int                       @default(0)
+  services_received     Int                       @default(0)
+  created_at            DateTime                  @default(now())
+  updated_at            DateTime                  @updatedAt
+  is_verified           Boolean                   @default(false)
+  is_online             Boolean                   @default(false)
   last_seen             DateTime?
   location              String?
   deleted_at            DateTime?
@@ -31,17 +31,18 @@ model User {
   posts                 Post[]
   savedPosts            SavedPost[]
   sessions              Session[]
-  received_transactions Transaction[]        @relation("Receiver")
-  sent_transactions     Transaction[]        @relation("Sender")
+  received_transactions Transaction[]             @relation("Receiver")
+  sent_transactions     Transaction[]             @relation("Sender")
   skills                UserSkill[]
-  conversationsShare ConversationParticipant[]
-  sender Message[]
-  MessageRead MessageReadReceipt[]
-  notifications Notification[]
-  providedExchanges ServiceExchange[] @relation("ProvidedExchanges")
-  receivedExchanges ServiceExchange[] @relation("ReceivedExchanges")
-  reviewsGiven      Review[]          @relation("ReviewsGiven")
-  reviewsReceived   Review[]          @relation("ReviewsReceived")
+  conversationsShare    ConversationParticipant[]
+  sender                Message[]
+  MessageRead           MessageReadReceipt[]
+  notifications         Notification[]
+  providedExchanges     ServiceExchange[]         @relation("ProvidedExchanges")
+  receivedExchanges     ServiceExchange[]         @relation("ReceivedExchanges")
+  reviewsGiven          Review[]                  @relation("ReviewsGiven")
+  reviewsReceived       Review[]                  @relation("ReviewsReceived")
+
   @@map("users")
 }
 
@@ -56,34 +57,35 @@ model Skill {
 }
 
 model UserSkill {
-  id         Int       @id @default(autoincrement())
+  id         Int        @id @default(autoincrement())
   user_id    Int
   skill_id   Int
   skill_type skill_type
-  created_at DateTime  @default(now())
-  skill      Skill     @relation(fields: [skill_id], references: [id], onDelete: Cascade)
-  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at DateTime   @default(now())
+  skill      Skill      @relation(fields: [skill_id], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, skill_id, skill_type])
   @@map("user_skills")
 }
 
 model Post {
-  id                    Int         @id @default(autoincrement())
+  id                    Int          @id @default(autoincrement())
   user_id               Int
   title                 String
   description           String
   category              PostCategory
   service_mode          ServiceMode
   assigned_time_credits Int
-  status                PostStatus  @default(PUBLISHED)
-  created_at            DateTime    @default(now())
-  updated_at            DateTime    @updatedAt
-  user                  User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  status                PostStatus   @default(PUBLISHED)
+  created_at            DateTime     @default(now())
+  updated_at            DateTime     @updatedAt
+  user                  User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   savedBy               SavedPost[]
 
-  conversations Conversation[]
+  conversations    Conversation[]
   serviceExchanges ServiceExchange[]
+
   @@index([status])
   @@index([user_id])
   @@map("posts")
@@ -205,12 +207,18 @@ enum EscrowStatus {
   REFUNDED
 }
 
+enum WorkSessionStatus {
+  PENDING_CONFIRMATION
+  CONFIRMED
+  REJECTED
+}
+
 model Conversation {
-  id         String   @id @default(cuid())
-  postId     Int?
-  directKey  String?  @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  postId    Int?
+  directKey String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   post         Post?                     @relation(fields: [postId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
@@ -219,34 +227,34 @@ model Conversation {
   @@map("conversations")
 }
 
-model ConversationParticipant{
-  id String @id @default(cuid())
-  conversationId String 
-  userId Int
-  joinedAt DateTime @default(now())
-
+model ConversationParticipant {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         Int
+  joinedAt       DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([conversationId, userId])
   @@map("conversation_participants")
 }
 
 model Message {
-  id String @id @default(cuid())
-  clientMessageId String? @unique
-  senderId Int
-  conversationId String
-  body  String
-  status MessageStatus @default(SENT)
-  createdAt DateTime @default(now())
-  deliveredAt DateTime?
-  readAt DateTime?
-  editedAt DateTime?
-  deletedAt DateTime?
+  id              String        @id @default(cuid())
+  clientMessageId String?       @unique
+  senderId        Int
+  conversationId  String
+  body            String
+  status          MessageStatus @default(SENT)
+  createdAt       DateTime      @default(now())
+  deliveredAt     DateTime?
+  readAt          DateTime?
+  editedAt        DateTime?
+  deletedAt       DateTime?
 
-  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade) 
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                 @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  conversation Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   readReceipts MessageReadReceipt[]
 
   @@index([conversationId, createdAt])
@@ -254,13 +262,13 @@ model Message {
 }
 
 model MessageReadReceipt {
-  id String @id @default(cuid())
+  id        String   @id @default(cuid())
   messageId String
-  userId Int
-  readAt DateTime @default(now())
+  userId    Int
+  readAt    DateTime @default(now())
 
-  message Message @relation(fields: [messageId], references: [id] , onDelete: Cascade)
-  user  User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, userId])
   @@map("message_read_receipts")
@@ -283,29 +291,48 @@ model Notification {
 }
 
 model ServiceExchange {
-  id            Int                   @id @default(autoincrement())
-  post_id       Int?
-  provider_id   Int
-  consumer_id   Int
-  time_credits  Int
-  status        ServiceExchangeStatus @default(PENDING)
-  escrow_status EscrowStatus          @default(NONE)
-  accepted_at   DateTime?
-  delivered_at  DateTime?
-  completed_at  DateTime?
-  canceled_at   DateTime?
-  created_at    DateTime              @default(now())
-  updated_at    DateTime              @updatedAt
+  id              Int                   @id @default(autoincrement())
+  post_id         Int?
+  provider_id     Int
+  consumer_id     Int
+  time_credits    Int
+  completed_hours Int                   @default(0)
+  status          ServiceExchangeStatus @default(PENDING)
+  escrow_status   EscrowStatus          @default(NONE)
+  accepted_at     DateTime?
+  delivered_at    DateTime?
+  completed_at    DateTime?
+  canceled_at     DateTime?
+  created_at      DateTime              @default(now())
+  updated_at      DateTime              @updatedAt
 
-  post     Post?    @relation(fields: [post_id], references: [id], onDelete: SetNull)
-  provider User     @relation("ProvidedExchanges", fields: [provider_id], references: [id])
-  consumer User     @relation("ReceivedExchanges", fields: [consumer_id], references: [id])
-  reviews  Review[]
+  post          Post?         @relation(fields: [post_id], references: [id], onDelete: SetNull)
+  provider      User          @relation("ProvidedExchanges", fields: [provider_id], references: [id])
+  consumer      User          @relation("ReceivedExchanges", fields: [consumer_id], references: [id])
+  reviews       Review[]
+  work_sessions WorkSession[]
 
   @@index([provider_id, status])
   @@index([consumer_id, status])
   @@index([status, completed_at])
   @@map("service_exchanges")
+}
+
+model WorkSession {
+  id             Int               @id @default(autoincrement())
+  contract_id    Int
+  session_number Int
+  hours          Int
+  notes          String?
+  status         WorkSessionStatus @default(PENDING_CONFIRMATION)
+  created_at     DateTime          @default(now())
+  confirmed_at   DateTime?
+
+  contract ServiceExchange @relation(fields: [contract_id], references: [id], onDelete: Cascade)
+
+  @@unique([contract_id, session_number])
+  @@index([contract_id, status])
+  @@map("work_sessions")
 }
 
 model Review {

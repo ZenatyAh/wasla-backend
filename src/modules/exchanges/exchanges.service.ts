@@ -1,7 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import { syncInteraction } from "../recommender/recommender.client.js";
 import { ExchangeError } from "./exchanges.errors.js";
-import type { CreateExchangeInput, ListExchangesQuery } from "./exchanges.schema.js";
+import type { CreateExchangeInput, ListExchangesQuery, CreateSessionInput } from "./exchanges.schema.js";
 
 const exchangeSelect = {
   id: true,
@@ -529,4 +529,196 @@ export const getExchangeById = async (id: number, userId: number) => {
   }
 
   return toExchangeResponse(exchange);
+};
+
+export const recordWorkSession = async (
+  contractId: number,
+  providerId: number,
+  data: CreateSessionInput,
+) => {
+  return await runSerializable(async (tx) => {
+    const exchange = await tx.serviceExchange.findUnique({
+      where: { id: contractId },
+      select: { id: true, provider_id: true, status: true, time_credits: true, completed_hours: true },
+    });
+
+    if (!exchange) {
+      throw new ExchangeError("Contract not found", 404);
+    }
+    if (exchange.provider_id !== providerId) {
+      throw new ExchangeError("Only the provider can record a session", 403);
+    }
+    if (exchange.status !== "IN_PROGRESS" && exchange.status !== "WAITING_CONFIRMATION") {
+      throw new ExchangeError("Contract is not active", 400);
+    }
+
+    const pendingSessions = await tx.workSession.findMany({
+      where: { contract_id: contractId, status: "PENDING_CONFIRMATION" },
+      select: { hours: true }
+    });
+    const pendingHours = pendingSessions.reduce((acc, s) => acc + s.hours, 0);
+
+    if (exchange.completed_hours + pendingHours + data.hours > exchange.time_credits) {
+      throw new ExchangeError("Total recorded hours cannot exceed agreed time credits", 400);
+    }
+
+    const lastSession = await tx.workSession.findFirst({
+      where: { contract_id: contractId },
+      orderBy: { session_number: "desc" },
+      select: { session_number: true },
+    });
+    const nextSessionNumber = lastSession ? lastSession.session_number + 1 : 1;
+
+    const session = await tx.workSession.create({
+      data: {
+        contract_id: contractId,
+        session_number: nextSessionNumber,
+        hours: data.hours,
+        notes: data.notes,
+        status: "PENDING_CONFIRMATION",
+      },
+    });
+    return session;
+  });
+};
+
+export const confirmWorkSession = async (
+  contractId: number,
+  sessionId: number,
+  requesterId: number,
+) => {
+  return await runSerializable(async (tx) => {
+    const exchange = await tx.serviceExchange.findUnique({
+      where: { id: contractId },
+      select: { id: true, consumer_id: true, provider_id: true, time_credits: true, completed_hours: true, status: true },
+    });
+
+    if (!exchange) {
+      throw new ExchangeError("Contract not found", 404);
+    }
+    if (exchange.consumer_id !== requesterId) {
+      throw new ExchangeError("Only the requester can confirm sessions", 403);
+    }
+
+    const session = await tx.workSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session || session.contract_id !== contractId) {
+      throw new ExchangeError("Session not found", 404);
+    }
+    if (session.status !== "PENDING_CONFIRMATION") {
+      throw new ExchangeError("Session is not pending confirmation", 400);
+    }
+
+    const updatedSession = await tx.workSession.update({
+      where: { id: sessionId },
+      data: { status: "CONFIRMED", confirmed_at: new Date() },
+    });
+
+    const newCompletedHours = exchange.completed_hours + session.hours;
+
+    await tx.serviceExchange.update({
+      where: { id: contractId },
+      data: { completed_hours: newCompletedHours },
+    });
+
+    if (newCompletedHours === exchange.time_credits) {
+      const released = await tx.user.updateMany({
+        where: {
+          id: exchange.consumer_id,
+          escrow_balance: { gte: exchange.time_credits },
+        },
+        data: {
+          escrow_balance: { decrement: exchange.time_credits },
+          services_received: { increment: 1 },
+        },
+      });
+      if (released.count === 0) {
+        throw new ExchangeError("Escrowed credits are not available for auto-completion", 400);
+      }
+
+      await tx.user.update({
+        where: { id: exchange.provider_id },
+        data: {
+          available_balance: { increment: exchange.time_credits },
+          services_provided: { increment: 1 },
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          sender_id: exchange.consumer_id,
+          receiver_id: exchange.provider_id,
+          amount: exchange.time_credits,
+          transaction_type: "TRANSFER",
+          reference_contract_id: exchange.id,
+        },
+      });
+
+      await tx.serviceExchange.update({
+        where: { id: contractId },
+        data: {
+          status: "COMPLETED",
+          escrow_status: "RELEASED",
+          completed_at: new Date(),
+        },
+      });
+    }
+
+    return updatedSession;
+  });
+};
+
+export const rejectWorkSession = async (
+  contractId: number,
+  sessionId: number,
+  requesterId: number,
+) => {
+  const exchange = await prisma.serviceExchange.findUnique({
+    where: { id: contractId },
+    select: { id: true, consumer_id: true },
+  });
+
+  if (!exchange) {
+    throw new ExchangeError("Contract not found", 404);
+  }
+  if (exchange.consumer_id !== requesterId) {
+    throw new ExchangeError("Only the requester can reject sessions", 403);
+  }
+
+  const session = await prisma.workSession.findUnique({
+    where: { id: sessionId },
+  });
+
+  if (!session || session.contract_id !== contractId) {
+    throw new ExchangeError("Session not found", 404);
+  }
+  if (session.status !== "PENDING_CONFIRMATION") {
+    throw new ExchangeError("Session is not pending confirmation", 400);
+  }
+
+  return await prisma.workSession.update({
+    where: { id: sessionId },
+    data: { status: "REJECTED" },
+  });
+};
+
+export const listWorkSessions = async (contractId: number, userId: number) => {
+  const exchange = await prisma.serviceExchange.findUnique({
+    where: { id: contractId },
+    select: { id: true, provider_id: true, consumer_id: true },
+  });
+
+  if (!exchange) {
+    throw new ExchangeError("Contract not found", 404);
+  }
+  if (exchange.provider_id !== userId && exchange.consumer_id !== userId) {
+    throw new ExchangeError("You are not a participant in this contract", 403);
+  }
+
+  return await prisma.workSession.findMany({
+    where: { contract_id: contractId },
+    orderBy: { session_number: "asc" },
+  });
 };

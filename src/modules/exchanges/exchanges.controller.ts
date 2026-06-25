@@ -11,10 +11,16 @@ import {
   listExchanges,
   rejectExchange,
   requestExchange,
+  recordWorkSession,
+  confirmWorkSession,
+  rejectWorkSession,
+  listWorkSessions,
 } from "./exchanges.service.js";
 import {
   exchangeIdParamSchema,
   listExchangesQuerySchema,
+  createSessionSchema,
+  sessionIdParamSchema,
   type CreateExchangeInput,
 } from "./exchanges.schema.js";
 
@@ -165,5 +171,60 @@ export const getExchangeByIdController = async (req: Request, res: Response) => 
     return res.json({ exchange });
   } catch (err: unknown) {
     return handleError(res, err, "Fetch exchange failed");
+  }
+};
+
+export const recordSessionController = async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return sendError(res, 401, "Unauthorized");
+
+    const id = exchangeIdParamSchema.parse(req.params.id);
+    const data = createSessionSchema.parse(req.body);
+    const session = await recordWorkSession(id, userId, data);
+    return res.status(201).json({ session });
+  } catch (err: unknown) {
+    return handleError(res, err, "Record session failed");
+  }
+};
+
+export const confirmSessionController = async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return sendError(res, 401, "Unauthorized");
+
+    const id = exchangeIdParamSchema.parse(req.params.id);
+    const sessionId = sessionIdParamSchema.parse(req.params.sessionId);
+    const session = await confirmWorkSession(id, sessionId, userId);
+    return res.json({ session });
+  } catch (err: unknown) {
+    return handleError(res, err, "Confirm session failed");
+  }
+};
+
+export const rejectSessionController = async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return sendError(res, 401, "Unauthorized");
+
+    const id = exchangeIdParamSchema.parse(req.params.id);
+    const sessionId = sessionIdParamSchema.parse(req.params.sessionId);
+    const session = await rejectWorkSession(id, sessionId, userId);
+    return res.json({ session });
+  } catch (err: unknown) {
+    return handleError(res, err, "Reject session failed");
+  }
+};
+
+export const listSessionsController = async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return sendError(res, 401, "Unauthorized");
+
+    const id = exchangeIdParamSchema.parse(req.params.id);
+    const sessions = await listWorkSessions(id, userId);
+    return res.json({ sessions });
+  } catch (err: unknown) {
+    return handleError(res, err, "List sessions failed");
   }
 };

@@ -28,3 +28,12 @@ export const exchangeIdParamSchema = z.coerce.number().int().positive();
 
 export type CreateExchangeInput = z.infer<typeof createExchangeSchema>;
 export type ListExchangesQuery = z.infer<typeof listExchangesQuerySchema>;
+
+export const createSessionSchema = z.object({
+  hours: z.coerce.number().int().positive().max(100000),
+  notes: z.string().optional(),
+});
+
+export const sessionIdParamSchema = z.coerce.number().int().positive();
+
+export type CreateSessionInput = z.infer<typeof createSessionSchema>;
