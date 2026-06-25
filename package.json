@@ -13,6 +13,7 @@
     "prisma:deploy": "sh scripts/migrate-deploy.sh",
     "prisma:resolve-escrow-failure": "prisma migrate resolve --rolled-back 20260607163129_add_contract_escrow_lifecycle",
     "prisma:resolve-init-failure": "prisma migrate resolve --rolled-back 20260625170852_init_schema && prisma migrate resolve --applied 20260625170852_init_schema",
+    "prisma:resolve-completed-hours-failure": "prisma migrate resolve --rolled-back 20260626140000_add_service_exchange_completed_hours",
     "prisma:seed": "prisma db seed",
     "seed:recommender": "tsx scripts/seed-recommender-dataset.ts",
     "seed:arabic": "tsx scripts/seed-arabic-demo.ts",
