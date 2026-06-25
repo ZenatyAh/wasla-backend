@@ -92,8 +92,8 @@ export const listWalletHistory = async (
   query: ListWalletHistoryQuery,
 ) => {
   const normalizedType = normalizeWalletType(query.type);
-  const includeCompleted = !query.status || query.status === "completed";
-  const includePending = !query.status || query.status === "pending";
+  const includeCompleted = !query.status || query.status === "completed" || query.status === "refunded";
+  const includeHeld = !query.status || query.status === "held" || query.status === "disputed";
   const includeCancelled = !query.status || query.status === "cancelled";
 
   const items: WalletHistoryItem[] = [];
@@ -135,7 +135,7 @@ export const listWalletHistory = async (
     }
   }
 
-  if (includePending && (!normalizedType || normalizedType === "credit" || normalizedType === "debit")) {
+  if (includeHeld && (!normalizedType || normalizedType === "credit" || normalizedType === "debit")) {
     const pendingExchanges = await findPendingEscrowExchanges(userId);
     for (const exchange of pendingExchanges) {
       const item = mapPendingExchangeToHistoryItem(exchange, userId);

@@ -109,7 +109,7 @@ export const findPendingEscrowExchanges = async (userId: number) =>
     where: {
       OR: [{ consumer_id: userId }, { provider_id: userId }],
       escrow_status: "HELD",
-      status: { in: ["IN_PROGRESS", "WAITING_CONFIRMATION"] },
+      status: { in: ["IN_PROGRESS", "WAITING_CONFIRMATION", "DISPUTED"] },
     },
     include: exchangeInclude,
     orderBy: { created_at: "desc" },

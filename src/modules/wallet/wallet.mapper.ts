@@ -12,7 +12,7 @@ export type WalletHistoryItem = {
     id: string;
     title: string;
   } | null;
-  status: "completed" | "pending" | "cancelled";
+  status: "completed" | "refunded" | "held" | "disputed" | "cancelled";
   timestamp: Date;
 };
 
@@ -96,7 +96,7 @@ export const mapTransactionToHistoryItem = (
             name: counterpartyUser?.full_name ?? "Unknown",
           },
     relatedServiceOrRequest,
-    status: "completed",
+    status: transaction.transaction_type === "REFUND" ? "refunded" : "completed",
     timestamp: transaction.created_at,
   };
 };
@@ -107,6 +107,7 @@ type PendingExchangeRecord = {
   provider_id: number;
   time_credits: number;
   created_at: Date;
+  status: string;
   post: { id: number; title: string } | null;
   provider: UserSummary;
   consumer: UserSummary;
@@ -130,7 +131,7 @@ export const mapPendingExchangeToHistoryItem = (
     relatedServiceOrRequest: exchange.post
       ? { id: String(exchange.post.id), title: exchange.post.title }
       : { id: String(exchange.id), title: "Service exchange" },
-    status: "pending",
+    status: exchange.status === "DISPUTED" ? "disputed" : "held",
     timestamp: exchange.created_at,
   };
 };
