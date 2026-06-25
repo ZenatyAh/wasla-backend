@@ -557,6 +557,7 @@ const createTrustReviews = async (
           time_credits: 1,
           status: "COMPLETED",
           escrow_status: "RELEASED",
+          maximum_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           completed_at: randomTimestamp(rng),
         },
       });
@@ -622,6 +623,7 @@ const seedInteractions = async (
       time_credits: row.time_credits,
       status: "PENDING",
       escrow_status: "NONE",
+      maximum_end_date: new Date(row.created_at.getTime() + 7 * 24 * 60 * 60 * 1000),
       created_at: row.created_at,
     })),
     skipDuplicates: true,

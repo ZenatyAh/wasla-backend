@@ -15,8 +15,11 @@ import {
   confirmSessionController,
   rejectSessionController,
   listSessionsController,
+  proposeDeadlineController,
+  approveDeadlineController,
+  rejectDeadlineController,
 } from "./exchanges.controller.js";
-import { createExchangeSchema, createSessionSchema } from "./exchanges.schema.js";
+import { createExchangeSchema, createSessionSchema, deadlineExtensionSchema } from "./exchanges.schema.js";
 
 const router = Router();
 
@@ -36,5 +39,9 @@ router.get("/:id/sessions", listSessionsController);
 router.post("/:id/sessions", validate(createSessionSchema), recordSessionController);
 router.put("/:id/sessions/:sessionId/confirm", confirmSessionController);
 router.put("/:id/sessions/:sessionId/reject", rejectSessionController);
+
+router.post("/:id/deadline", validate(deadlineExtensionSchema), proposeDeadlineController);
+router.put("/:id/deadline/approve", approveDeadlineController);
+router.put("/:id/deadline/reject", rejectDeadlineController);
 
 export default router;

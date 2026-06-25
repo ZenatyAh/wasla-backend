@@ -1,7 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import { syncInteraction } from "../recommender/recommender.client.js";
 import { ExchangeError } from "./exchanges.errors.js";
-import type { CreateExchangeInput, ListExchangesQuery, CreateSessionInput } from "./exchanges.schema.js";
+import type { CreateExchangeInput, ListExchangesQuery, CreateSessionInput, DeadlineExtensionInput } from "./exchanges.schema.js";
 
 const exchangeSelect = {
   id: true,
@@ -11,6 +11,8 @@ const exchangeSelect = {
   time_credits: true,
   status: true,
   escrow_status: true,
+  maximum_end_date: true,
+  proposed_end_date: true,
   accepted_at: true,
   delivered_at: true,
   completed_at: true,
@@ -168,6 +170,7 @@ export const requestExchange = async (
       provider_id: data.providerId,
       consumer_id: requesterId,
       time_credits: data.duration,
+      maximum_end_date: data.maximumEndDate,
       status: "PENDING",
       escrow_status: "NONE",
     },
@@ -721,4 +724,145 @@ export const listWorkSessions = async (contractId: number, userId: number) => {
     where: { contract_id: contractId },
     orderBy: { session_number: "asc" },
   });
+};
+
+export const proposeDeadlineExtension = async (
+  contractId: number,
+  providerId: number,
+  data: DeadlineExtensionInput,
+) => {
+  const exchange = await prisma.serviceExchange.findUnique({
+    where: { id: contractId },
+  });
+
+  if (!exchange) throw new ExchangeError("Contract not found", 404);
+  if (exchange.provider_id !== providerId) throw new ExchangeError("Only the provider can propose an extension", 403);
+  if (exchange.status !== "IN_PROGRESS" && exchange.status !== "WAITING_CONFIRMATION") {
+    throw new ExchangeError("Cannot extend a contract that is not active", 400);
+  }
+
+  return await prisma.serviceExchange.update({
+    where: { id: contractId },
+    data: { proposed_end_date: data.proposedEndDate },
+    select: exchangeSelect,
+  });
+};
+
+export const approveDeadlineExtension = async (contractId: number, consumerId: number) => {
+  const exchange = await prisma.serviceExchange.findUnique({
+    where: { id: contractId },
+  });
+
+  if (!exchange) throw new ExchangeError("Contract not found", 404);
+  if (exchange.consumer_id !== consumerId) throw new ExchangeError("Only the consumer can approve an extension", 403);
+  if (!exchange.proposed_end_date) throw new ExchangeError("No deadline extension proposed", 400);
+
+  return await prisma.serviceExchange.update({
+    where: { id: contractId },
+    data: {
+      maximum_end_date: exchange.proposed_end_date,
+      proposed_end_date: null,
+    },
+    select: exchangeSelect,
+  });
+};
+
+export const rejectDeadlineExtension = async (contractId: number, consumerId: number) => {
+  const exchange = await prisma.serviceExchange.findUnique({
+    where: { id: contractId },
+  });
+
+  if (!exchange) throw new ExchangeError("Contract not found", 404);
+  if (exchange.consumer_id !== consumerId) throw new ExchangeError("Only the consumer can reject an extension", 403);
+  if (!exchange.proposed_end_date) throw new ExchangeError("No deadline extension proposed", 400);
+
+  return await prisma.serviceExchange.update({
+    where: { id: contractId },
+    data: { proposed_end_date: null },
+    select: exchangeSelect,
+  });
+};
+
+export const resolveExpiredContracts = async () => {
+  const now = new Date();
+
+  // Find active contracts that have passed their maximum_end_date
+  const expiredContracts = await prisma.serviceExchange.findMany({
+    where: {
+      status: { in: ["IN_PROGRESS", "WAITING_CONFIRMATION"] },
+      maximum_end_date: { lte: now },
+    },
+  });
+
+  let resolvedCount = 0;
+
+  for (const contract of expiredContracts) {
+    try {
+      await runSerializable(async (tx) => {
+        // Re-fetch with a lock
+        const currentContract = await tx.serviceExchange.findUnique({
+          where: { id: contract.id },
+        });
+
+        if (
+          !currentContract ||
+          (currentContract.status !== "IN_PROGRESS" && currentContract.status !== "WAITING_CONFIRMATION") ||
+          currentContract.maximum_end_date > now
+        ) {
+          return; // State changed, skip
+        }
+
+        const providerCredits = currentContract.completed_hours;
+        const refundCredits = currentContract.time_credits - providerCredits;
+
+        // Perform transfers
+        if (providerCredits > 0) {
+          await tx.user.update({
+            where: { id: currentContract.provider_id },
+            data: { available_balance: { increment: providerCredits } },
+          });
+
+          await tx.transaction.create({
+            data: {
+              sender_id: currentContract.consumer_id,
+              receiver_id: currentContract.provider_id,
+              amount: providerCredits,
+              transaction_type: "TRANSFER",
+            },
+          });
+        }
+
+        if (refundCredits > 0) {
+          await tx.user.update({
+            where: { id: currentContract.consumer_id },
+            data: { available_balance: { increment: refundCredits } },
+          });
+
+          await tx.transaction.create({
+            data: {
+              sender_id: currentContract.consumer_id,
+              receiver_id: currentContract.consumer_id,
+              amount: refundCredits,
+              transaction_type: "REFUND",
+            },
+          });
+        }
+
+        // Complete the contract
+        await tx.serviceExchange.update({
+          where: { id: currentContract.id },
+          data: {
+            status: "COMPLETED",
+            escrow_status: "RELEASED",
+            completed_at: now,
+          },
+        });
+      });
+      resolvedCount++;
+    } catch (error) {
+      console.error(`Failed to resolve expired contract ${contract.id}:`, error);
+    }
+  }
+
+  return resolvedCount;
 };

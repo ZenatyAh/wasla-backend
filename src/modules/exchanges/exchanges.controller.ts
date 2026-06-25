@@ -15,6 +15,9 @@ import {
   confirmWorkSession,
   rejectWorkSession,
   listWorkSessions,
+  proposeDeadlineExtension,
+  approveDeadlineExtension,
+  rejectDeadlineExtension,
 } from "./exchanges.service.js";
 import {
   exchangeIdParamSchema,
@@ -22,6 +25,7 @@ import {
   createSessionSchema,
   sessionIdParamSchema,
   type CreateExchangeInput,
+  type DeadlineExtensionInput,
 } from "./exchanges.schema.js";
 
 const getUserId = (req: Request) => {
@@ -226,5 +230,45 @@ export const listSessionsController = async (req: Request, res: Response) => {
     return res.json({ sessions });
   } catch (err: unknown) {
     return handleError(res, err, "List sessions failed");
+  }
+};
+
+export const proposeDeadlineController = async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return sendError(res, 401, "Unauthorized");
+
+    const id = exchangeIdParamSchema.parse(req.params.id);
+    const body = req.body as DeadlineExtensionInput;
+    const exchange = await proposeDeadlineExtension(id, userId, body);
+    return res.json({ exchange });
+  } catch (err: unknown) {
+    return handleError(res, err, "Propose deadline extension failed");
+  }
+};
+
+export const approveDeadlineController = async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return sendError(res, 401, "Unauthorized");
+
+    const id = exchangeIdParamSchema.parse(req.params.id);
+    const exchange = await approveDeadlineExtension(id, userId);
+    return res.json({ exchange });
+  } catch (err: unknown) {
+    return handleError(res, err, "Approve deadline extension failed");
+  }
+};
+
+export const rejectDeadlineController = async (req: Request, res: Response) => {
+  try {
+    const userId = getUserId(req);
+    if (!userId) return sendError(res, 401, "Unauthorized");
+
+    const id = exchangeIdParamSchema.parse(req.params.id);
+    const exchange = await rejectDeadlineExtension(id, userId);
+    return res.json({ exchange });
+  } catch (err: unknown) {
+    return handleError(res, err, "Reject deadline extension failed");
   }
 };

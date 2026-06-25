@@ -8,7 +8,10 @@ import {
 import { chatFrontendHtml } from "./docs/chatFrontendHtml.js";
 import { openApiSpec } from "./docs/openapi.js";
 import { swaggerHtml } from "./docs/swaggerHtml.js";
+import { startCronJobs } from "./common/cron/contract-resolution.cron.js";
+
 const app = express();
+startCronJobs();
 export default app;
 
 import authroutes from "./modules/auth/auth.routes.js";

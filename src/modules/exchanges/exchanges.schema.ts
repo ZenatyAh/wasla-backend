@@ -15,6 +15,7 @@ export const createExchangeSchema = z.object({
   postId: z.coerce.number().int().positive(),
   providerId: z.coerce.number().int().positive(),
   duration: z.coerce.number().int().positive().max(100000),
+  maximumEndDate: z.coerce.date().refine(val => val > new Date(), { message: "Maximum end date must be in the future" }),
 });
 
 export const listExchangesQuerySchema = z.object({
@@ -37,3 +38,8 @@ export const createSessionSchema = z.object({
 export const sessionIdParamSchema = z.coerce.number().int().positive();
 
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
+
+export const deadlineExtensionSchema = z.object({
+  proposedEndDate: z.coerce.date().refine(val => val > new Date(), { message: "Proposed end date must be in the future" }),
+});
+export type DeadlineExtensionInput = z.infer<typeof deadlineExtensionSchema>;
