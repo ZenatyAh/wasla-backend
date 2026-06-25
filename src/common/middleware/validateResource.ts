@@ -3,9 +3,9 @@ import { ZodObject, ZodError } from "zod";
 
 // هذه Function تستقبل الـ Schema وترجع Middleware
 const validate =
-  (schema: ZodObject) => (req: Request, res: Response, next: NextFunction) => {
+  (schema: any, source: "body" | "query" | "params" = "body") => (req: Request, res: Response, next: NextFunction) => {
     try {
-      req.body = schema.parse(req.body);
+      req[source] = schema.parse(req[source]);
 
       next(); // إذا نجح التحقق، انتقل للـ Controller
     } catch (e: any) {

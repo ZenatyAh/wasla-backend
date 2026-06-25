@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import bcrypt from "bcrypt";
-import { createSession } from "./Register/create_session.js";
+import { createSession } from "./register/create_session.js";
 // Function Controller
 export const loginService = async (data: any, meta: any) => {
   const { email, password } = data;

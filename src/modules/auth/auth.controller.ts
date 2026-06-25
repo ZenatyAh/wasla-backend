@@ -1,5 +1,5 @@
 import type { Response, Request } from "express";
-import { loginService } from "./loginService.js";
+import { loginService } from "./login.service.js";
 import { metaExtract } from "../../common/utils/meta.js";
 import { setRefreshTokenCookie } from "../../common/utils/cookies.js";
 import { getErrorMessage, sendError } from "../../common/utils/httpError.js";

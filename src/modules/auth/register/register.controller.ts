@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { RegisterService } from "./Register.service.js";
+import { RegisterService } from "./register.service.js";
 import { metaExtract } from "../../../common/utils/meta.js";
 import type { RegisterInput } from "../auth.schema.js";
 import { setRefreshTokenCookie } from "../../../common/utils/cookies.js";

@@ -3,7 +3,7 @@ import { authMiddleware } from "../../common/middleware/auth.middleware.js";
 import validate from "../../common/middleware/validateResource.js";
 import { loginLimite } from "../../common/middleware/ratelimi.js";
 import { loginController } from "./auth.controller.js";
-import { RegisterControler } from "./Register/Register.controller.js";
+import { RegisterControler } from "./register/register.controller.js";
 import {
   changePasswordSchema,
   loginschema,

@@ -263,17 +263,28 @@ export const acceptExchange = async (id: number, providerId: number) => {
 };
 
 export const rejectExchange = async (id: number, providerId: number) => {
-  const exchange = await findExchangeOrThrow(id);
-  if (exchange.provider_id !== providerId) {
-    throw new ExchangeError("Only the provider can reject this exchange", 403);
-  }
-  if (exchange.status !== "PENDING") {
-    throw new ExchangeError("Exchange is not pending", 400);
-  }
+  await runSerializable(async (tx) => {
+    const exchange = await tx.serviceExchange.findUnique({
+      where: { id },
+      select: { id: true, provider_id: true, status: true },
+    });
+    if (!exchange) {
+      throw new ExchangeError("Exchange not found", 404);
+    }
+    if (exchange.provider_id !== providerId) {
+      throw new ExchangeError("Only the provider can reject this exchange", 403);
+    }
+    if (exchange.status !== "PENDING") {
+      throw new ExchangeError("Exchange is not pending", 400);
+    }
 
-  await prisma.serviceExchange.update({
-    where: { id },
-    data: { status: "REJECTED" },
+    const updated = await tx.serviceExchange.updateMany({
+      where: { id, status: "PENDING" },
+      data: { status: "REJECTED" },
+    });
+    if (updated.count === 0) {
+      throw new ExchangeError("Exchange is no longer pending", 409);
+    }
   });
 
   const result = await fetchExchange(id);
@@ -290,20 +301,31 @@ export const rejectExchange = async (id: number, providerId: number) => {
 };
 
 export const deliverExchange = async (id: number, providerId: number) => {
-  const exchange = await findExchangeOrThrow(id);
-  if (exchange.provider_id !== providerId) {
-    throw new ExchangeError(
-      "Only the provider can mark this exchange as delivered",
-      403,
-    );
-  }
-  if (exchange.status !== "IN_PROGRESS") {
-    throw new ExchangeError("Exchange is not in progress", 400);
-  }
+  await runSerializable(async (tx) => {
+    const exchange = await tx.serviceExchange.findUnique({
+      where: { id },
+      select: { id: true, provider_id: true, status: true },
+    });
+    if (!exchange) {
+      throw new ExchangeError("Exchange not found", 404);
+    }
+    if (exchange.provider_id !== providerId) {
+      throw new ExchangeError(
+        "Only the provider can mark this exchange as delivered",
+        403,
+      );
+    }
+    if (exchange.status !== "IN_PROGRESS") {
+      throw new ExchangeError("Exchange is not in progress", 400);
+    }
 
-  await prisma.serviceExchange.update({
-    where: { id },
-    data: { status: "WAITING_CONFIRMATION", delivered_at: new Date() },
+    const updated = await tx.serviceExchange.updateMany({
+      where: { id, status: "IN_PROGRESS" },
+      data: { status: "WAITING_CONFIRMATION", delivered_at: new Date() },
+    });
+    if (updated.count === 0) {
+      throw new ExchangeError("Exchange is no longer in progress", 409);
+    }
   });
 
   return fetchExchange(id);

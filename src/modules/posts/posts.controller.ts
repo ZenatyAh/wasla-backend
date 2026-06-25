@@ -6,8 +6,6 @@ import type { CreatePostInput, UpdatePostInput } from "./posts.schema.js";
 import { listPostsQuerySchema } from "./posts.schema.js";
 import { getErrorMessage, sendError } from "../../common/utils/httpError.js";
 
-const postIdSchema = z.coerce.number().int().positive();
-
 const getUserId = (req: Request) => {
   const userId = Number(req.user?.userId)
   if (!Number.isInteger(userId)) {
@@ -52,7 +50,7 @@ export const getPostByIdController = async (req: Request, res: Response) => {
       return sendError(res, 401, "Unauthorized")
     }
 
-    const postId = postIdSchema.parse(req.params.postId)
+    const postId = req.params.postId as unknown as number;
     const post = await getPostByIdService(postId, userId)
     return res.json({ post })
   } catch (err: unknown) {
@@ -85,7 +83,7 @@ export const updatePostController = async (req: Request, res: Response) => {
       return sendError(res, 401, "Unauthorized")
     }
 
-    const postId = postIdSchema.parse(req.params.postId)
+    const postId = req.params.postId as unknown as number;
     const data: UpdatePostInput = req.body
     const post = await updatePostService(postId, userId, data)
 
@@ -102,7 +100,7 @@ export const deletePostController = async (req: Request, res: Response) => {
       return sendError(res, 401, "Unauthorized")
     }
 
-    const postId = postIdSchema.parse(req.params.postId)
+    const postId = req.params.postId as unknown as number;
     await deletePostService(postId, userId)
 
     return res.status(204).end()
@@ -125,7 +123,7 @@ export const savePostController = async (req: Request, res: Response) => {
       return sendError(res, 401, "Unauthorized");
     }
 
-    const postId = postIdSchema.parse(req.params.postId);
+    const postId = req.params.postId as unknown as number;
     const savedPost = await savePostService(postId, userId);
     return res.status(201).json({ savedPost });
   } catch (err: unknown) {
@@ -140,7 +138,7 @@ export const unsavePostController = async (req: Request, res: Response) => {
       return sendError(res, 401, "Unauthorized");
     }
 
-    const postId = postIdSchema.parse(req.params.postId);
+    const postId = req.params.postId as unknown as number;
     await unsavePostService(postId, userId);
     return res.status(200).json({ message: "Post unsaved successfully" });
   } catch (err: unknown) {

@@ -60,3 +60,7 @@ export type UpdatePostInput = z.infer<typeof updatePostSchema>
 export type ListPostsQuery = z.infer<typeof listPostsQuerySchema>
 export type SearchPostsInput = z.infer<typeof searchPostsSchema>
 
+export const postIdParamSchema = z.object({
+    postId: z.coerce.number().int().positive(),
+});
+
