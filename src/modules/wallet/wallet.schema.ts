@@ -9,7 +9,9 @@ export const walletTransactionTypeSchema = z.enum([
 
 export const walletTransactionStatusSchema = z.enum([
   "completed",
-  "pending",
+  "refunded",
+  "held",
+  "disputed",
   "cancelled",
 ]);
 
