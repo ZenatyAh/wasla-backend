@@ -77,6 +77,8 @@ model Post {
   category              PostCategory
   service_mode          ServiceMode
   assigned_time_credits Int
+  city                  String?
+  area                  String?
   status                PostStatus   @default(PUBLISHED)
   created_at            DateTime     @default(now())
   updated_at            DateTime     @updatedAt

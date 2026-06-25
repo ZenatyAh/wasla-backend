@@ -44,10 +44,11 @@ const fallbackSearch = async (
         ...(filters.maxCredits !== undefined ? { lte: filters.maxCredits } : {}),
       };
     }
-    if (filters.location) {
-      whereClause.user = {
-        location: { contains: filters.location, mode: "insensitive" },
-      };
+    if (filters.city) {
+      whereClause.city = { contains: filters.city, mode: "insensitive" };
+    }
+    if (filters.area) {
+      whereClause.area = { contains: filters.area, mode: "insensitive" };
     }
   }
 
@@ -117,10 +118,11 @@ export const searchPostsService = async (input: SearchPostsInput) => {
           ...(filters.maxCredits !== undefined ? { lte: filters.maxCredits } : {}),
         };
       }
-      if (filters.location) {
-        whereClause.user = {
-          location: { contains: filters.location, mode: "insensitive" },
-        };
+      if (filters.city) {
+        whereClause.city = { contains: filters.city, mode: "insensitive" };
+      }
+      if (filters.area) {
+        whereClause.area = { contains: filters.area, mode: "insensitive" };
       }
     }
 

@@ -6,6 +6,8 @@ export const postSelect = {
   category: true,
   service_mode: true,
   assigned_time_credits: true,
+  city: true,
+  area: true,
   status: true,
   created_at: true,
   updated_at: true,
@@ -27,6 +29,8 @@ export type PostRecord = {
   category: string;
   service_mode: string;
   assigned_time_credits: number;
+  city: string | null;
+  area: string | null;
   status: string;
   created_at: Date;
   updated_at: Date;
@@ -46,6 +50,8 @@ export const toPostResponse = (post: PostRecord) => ({
   category: post.category,
   serviceMode: post.service_mode,
   assignedTimeCredits: post.assigned_time_credits,
+  city: post.city,
+  area: post.area,
   status: post.status,
   createdAt: post.created_at,
   updatedAt: post.updated_at,

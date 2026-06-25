@@ -413,6 +413,8 @@ const buildPostPlans = (profile: UserProfile, rng: () => number) => {
     serviceMode: ServiceMode;
     timeCredits: number;
     location: string;
+    city?: string;
+    area?: string;
     title: string;
     description: string;
     createdAt: Date;
@@ -423,12 +425,18 @@ const buildPostPlans = (profile: UserProfile, rng: () => number) => {
     const serviceMode = serviceModeForCategory(category, rng);
     const location = postLocation(profile.location, serviceMode, rng);
     const timeCredits = randomInt(rng, 1, 5);
+    const locationParts = location.split(" - ");
+    const city = serviceMode === "OFFLINE" ? locationParts[0] : undefined;
+    const area = serviceMode === "OFFLINE" ? (locationParts[1] || "وسط البلد") : undefined;
+
     plans.push({
       postType: "OFFER",
       category,
       serviceMode,
       timeCredits,
       location,
+      city,
+      area,
       title: `${category} — ${titleFor(category, "offer", profile.index + i)}`,
       description: descriptionFor(category, "offer", profile.index + i, location, serviceMode),
       createdAt: randomTimestamp(rng),
@@ -440,12 +448,18 @@ const buildPostPlans = (profile: UserProfile, rng: () => number) => {
     const serviceMode = serviceModeForCategory(category, rng);
     const location = postLocation(profile.location, serviceMode, rng);
     const timeCredits = randomInt(rng, 1, 5);
+    const locationParts = location.split(" - ");
+    const city = serviceMode === "OFFLINE" ? locationParts[0] : undefined;
+    const area = serviceMode === "OFFLINE" ? (locationParts[1] || "وسط البلد") : undefined;
+
     plans.push({
       postType: "REQUEST",
       category,
       serviceMode,
       timeCredits,
       location,
+      city,
+      area,
       title: `${category} — ${titleFor(category, "request", profile.index + i)}`,
       description: descriptionFor(category, "request", profile.index + i, location, serviceMode),
       createdAt: randomTimestamp(rng),
@@ -873,6 +887,8 @@ const createPostsViaApi = async (
           category: plan.postType,
           serviceMode: plan.serviceMode,
           assignedTimeCredits: plan.timeCredits,
+          city: plan.city,
+          area: plan.area,
         }),
       }),
     );
@@ -1020,6 +1036,8 @@ const runDbMode = async () => {
             category: plan.postType,
             service_mode: plan.serviceMode,
             assigned_time_credits: plan.timeCredits,
+            city: plan.city,
+            area: plan.area,
             status: "PUBLISHED",
             created_at: plan.createdAt,
           },

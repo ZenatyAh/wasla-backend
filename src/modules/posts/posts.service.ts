@@ -39,6 +39,8 @@ const buildPostUpdateData = (data: UpdatePostInput) => ({
         ? { assigned_time_credits: data.assignedTimeCredits }
         : {}),
     ...(data.status !== undefined ? { status: data.status } : {}),
+    ...(data.city !== undefined ? { city: data.city } : {}),
+    ...(data.area !== undefined ? { area: data.area } : {}),
 })
 
 export const createPostService = async (data: CreatePostInput,userId: number) => {
@@ -51,6 +53,8 @@ export const createPostService = async (data: CreatePostInput,userId: number) =>
         service_mode: data.serviceMode,
         assigned_time_credits: data.assignedTimeCredits,
         status: data.status,
+        city: data.city,
+        area: data.area,
     },
     select: postSelect,
     })
@@ -114,13 +118,21 @@ export const getPostByIdService = async (postId: number, userId: number) => {
 export const updatePostService = async (postId: number,userId: number,data: UpdatePostInput) => {
     const post = await prisma.post.findUnique({
         where: { id: postId },
-        select: { user_id: true },
+        select: { user_id: true, service_mode: true, city: true, area: true },
     })
     if (!post) {
         throw new Error("Post not found");
     }
     if (post.user_id !== userId) {
         throw new Error("You can only edit your own posts");
+    }
+
+    const newServiceMode = data.serviceMode ?? post.service_mode;
+    const newCity = data.city !== undefined ? data.city : post.city;
+    const newArea = data.area !== undefined ? data.area : post.area;
+
+    if (newServiceMode === "OFFLINE" && (!newCity || !newArea)) {
+        throw new Error("City and Area are required for offline services");
     }
 
     return prisma.post.update({
