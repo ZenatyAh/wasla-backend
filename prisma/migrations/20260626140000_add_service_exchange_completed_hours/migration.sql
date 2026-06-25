@@ -2,14 +2,24 @@
 ALTER TABLE "service_exchanges"
   ADD COLUMN IF NOT EXISTS "completed_hours" INTEGER NOT NULL DEFAULT 0;
 
--- Backfill from confirmed work sessions so existing contracts stay accurate.
-UPDATE "service_exchanges" se
-SET "completed_hours" = COALESCE(
-  (
-    SELECT SUM(ws.hours)
-    FROM "work_sessions" ws
-    WHERE ws.contract_id = se.id
-      AND ws.status = 'CONFIRMED'
-  ),
-  0
-);
+-- Backfill from confirmed work sessions when the table exists (may be missing on baselined DBs).
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'work_sessions'
+  ) THEN
+    UPDATE "service_exchanges" se
+    SET "completed_hours" = COALESCE(
+      (
+        SELECT SUM(ws.hours)
+        FROM "work_sessions" ws
+        WHERE ws.contract_id = se.id
+          AND ws.status = 'CONFIRMED'
+      ),
+      0
+    );
+  END IF;
+END $$;
