@@ -4,7 +4,6 @@ import {
   RecommenderUnavailableError,
   type RecommenderSearchItem,
 } from "../recommender/recommender.client.js";
-import { hydratePublishedPostsById } from "./posts.hydration.js";
 import { postSelect, toPostResponse, type PostRecord } from "./posts.mapper.js";
 import type { SearchPostsInput } from "./posts.schema.js";
 
@@ -22,39 +21,80 @@ const mapScores = (item: RecommenderSearchItem): SearchScores => ({
   finalScore: item.final_score,
 });
 
+const hasActiveFilters = (filters?: SearchPostsInput["filters"]) =>
+  Boolean(
+    filters &&
+      (filters.category !== undefined ||
+        filters.serviceMode !== undefined ||
+        filters.minCredits !== undefined ||
+        filters.maxCredits !== undefined ||
+        filters.location !== undefined),
+  );
+
+const countPublishedPosts = async () =>
+  prisma.post.count({ where: { status: "PUBLISHED" } });
+
+const resolveRecommenderTopK = async (
+  topK: number | undefined,
+  filters?: SearchPostsInput["filters"],
+): Promise<number> => {
+  const filtered = hasActiveFilters(filters);
+
+  if (topK !== undefined) {
+    return filtered ? Math.max(100, topK * 5) : topK;
+  }
+
+  const totalPublished = await countPublishedPosts();
+  return filtered ? Math.max(totalPublished, 100) : totalPublished;
+};
+
+const limitResults = <T>(items: T[], topK?: number) =>
+  topK !== undefined ? items.slice(0, topK) : items;
+
+const buildFilteredWhereClause = (
+  filters?: SearchPostsInput["filters"],
+  baseWhere: Record<string, unknown> = {},
+) => {
+  const whereClause: Record<string, unknown> = { ...baseWhere };
+
+  if (!filters) {
+    return whereClause;
+  }
+
+  if (filters.category) whereClause.category = filters.category;
+  if (filters.serviceMode) whereClause.service_mode = filters.serviceMode;
+  if (filters.minCredits !== undefined || filters.maxCredits !== undefined) {
+    whereClause.assigned_time_credits = {
+      ...(filters.minCredits !== undefined ? { gte: filters.minCredits } : {}),
+      ...(filters.maxCredits !== undefined ? { lte: filters.maxCredits } : {}),
+    };
+  }
+  if (filters.location) {
+    whereClause.user = {
+      location: { contains: filters.location, mode: "insensitive" },
+    };
+  }
+
+  return whereClause;
+};
+
 const fallbackSearch = async (
   query: string,
-  topK: number,
+  topK: number | undefined,
   filters?: SearchPostsInput["filters"],
 ) => {
-  const whereClause: any = {
+  const whereClause = buildFilteredWhereClause(filters, {
     status: "PUBLISHED",
     OR: [
       { title: { contains: query, mode: "insensitive" } },
       { description: { contains: query, mode: "insensitive" } },
     ],
-  };
-
-  if (filters) {
-    if (filters.category) whereClause.category = filters.category;
-    if (filters.serviceMode) whereClause.service_mode = filters.serviceMode;
-    if (filters.minCredits !== undefined || filters.maxCredits !== undefined) {
-      whereClause.assigned_time_credits = {
-        ...(filters.minCredits !== undefined ? { gte: filters.minCredits } : {}),
-        ...(filters.maxCredits !== undefined ? { lte: filters.maxCredits } : {}),
-      };
-    }
-    if (filters.location) {
-      whereClause.user = {
-        location: { contains: filters.location, mode: "insensitive" },
-      };
-    }
-  }
+  });
 
   const posts = await prisma.post.findMany({
     where: whereClause,
     orderBy: [{ created_at: "desc" }, { id: "desc" }],
-    take: topK,
+    ...(topK !== undefined ? { take: topK } : {}),
     select: postSelect,
   });
 
@@ -73,9 +113,7 @@ export const searchPostsService = async (input: SearchPostsInput) => {
   const { query, topK, threshold, filters } = input;
 
   try {
-    // If filters are specified, request a larger page size from the recommender
-    // to ensure we have enough semantic candidates to filter in SQL.
-    const recommenderTopK = filters ? Math.max(100, topK * 5) : topK;
+    const recommenderTopK = await resolveRecommenderTopK(topK, filters);
 
     const aiResponse = await fetchSearchResults(query, {
       top_k: recommenderTopK,
@@ -103,26 +141,10 @@ export const searchPostsService = async (input: SearchPostsInput) => {
       };
     }
 
-    const whereClause: any = {
+    const whereClause = buildFilteredWhereClause(filters, {
       id: { in: orderedIds },
       status: "PUBLISHED",
-    };
-
-    if (filters) {
-      if (filters.category) whereClause.category = filters.category;
-      if (filters.serviceMode) whereClause.service_mode = filters.serviceMode;
-      if (filters.minCredits !== undefined || filters.maxCredits !== undefined) {
-        whereClause.assigned_time_credits = {
-          ...(filters.minCredits !== undefined ? { gte: filters.minCredits } : {}),
-          ...(filters.maxCredits !== undefined ? { lte: filters.maxCredits } : {}),
-        };
-      }
-      if (filters.location) {
-        whereClause.user = {
-          location: { contains: filters.location, mode: "insensitive" },
-        };
-      }
-    }
+    });
 
     const posts = await prisma.post.findMany({
       where: whereClause,
@@ -133,24 +155,25 @@ export const searchPostsService = async (input: SearchPostsInput) => {
       (posts as PostRecord[]).map((post) => [post.id, post]),
     );
 
-    const results = orderedIds
-      .map((id) => byId.get(id))
-      .filter((post): post is PostRecord => Boolean(post))
-      .map((post) => {
-        const aiItem = scoreByPostId.get(post.id);
-        return {
-          post: toPostResponse(post),
-          scores: aiItem ? mapScores(aiItem) : null,
-        };
-      });
-
-    const finalResults = filters ? results.slice(0, topK) : results;
+    const results = limitResults(
+      orderedIds
+        .map((id) => byId.get(id))
+        .filter((post): post is PostRecord => Boolean(post))
+        .map((post) => {
+          const aiItem = scoreByPostId.get(post.id);
+          return {
+            post: toPostResponse(post),
+            scores: aiItem ? mapScores(aiItem) : null,
+          };
+        }),
+      topK,
+    );
 
     return {
       query: aiResponse.query,
-      count: finalResults.length,
+      count: results.length,
       source: "recommender" as const,
-      results: finalResults,
+      results,
     };
   } catch (err: unknown) {
     if (err instanceof RecommenderUnavailableError) {

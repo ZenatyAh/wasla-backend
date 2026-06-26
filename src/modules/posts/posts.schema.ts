@@ -49,7 +49,7 @@ export const searchPostsFiltersSchema = z.object({
 
 export const searchPostsSchema = z.object({
     query: z.string().trim().min(1).max(500),
-    topK: z.number().int().min(1).max(50).optional().default(20),
+    topK: z.number().int().min(1).optional(),
     threshold: z.number().min(0).max(1).optional(),
     filters: searchPostsFiltersSchema.optional(),
 })

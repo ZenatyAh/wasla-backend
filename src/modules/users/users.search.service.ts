@@ -37,6 +37,7 @@ export const searchUsersService = async (input: SearchUsersInput) => {
             skill: {
               name: { contains: query, mode: "insensitive" },
             },
+            ...(filters?.skillType ? { skill_type: filters.skillType } : {}),
           },
         },
       },

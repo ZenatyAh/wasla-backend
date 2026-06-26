@@ -2510,8 +2510,8 @@ export const openApiSpec = {
           topK: {
             type: "integer",
             minimum: 1,
-            maximum: 50,
-            default: 20,
+            description:
+              "Optional max results. When omitted, all matching posts are returned.",
             example: 20,
           },
           threshold: {
