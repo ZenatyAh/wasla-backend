@@ -54,11 +54,10 @@ export const searchUsersService = async (input: SearchUsersInput) => {
       whereClause.location = { contains: filters.location, mode: "insensitive" };
     }
     if (filters.skillType) {
-      whereClause.skills = {
-        some: {
-          skill_type: filters.skillType,
-        },
-      };
+      whereClause.AND = [
+        ...(whereClause.AND ?? []),
+        { skills: { some: { skill_type: filters.skillType } } },
+      ];
     }
   }
 

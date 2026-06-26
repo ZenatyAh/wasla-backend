@@ -44,8 +44,7 @@ export const searchPostsFiltersSchema = z.object({
     serviceMode: serviceModeSchema.optional(),
     minCredits: z.number().int().nonnegative().optional(),
     maxCredits: z.number().int().nonnegative().optional(),
-    city: z.string().trim().min(2).optional(),
-    area: z.string().trim().min(2).optional(),
+    location: z.string().trim().min(1).optional(),
 })
 
 export const searchPostsSchema = z.object({
