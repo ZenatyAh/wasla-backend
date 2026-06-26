@@ -2561,6 +2561,16 @@ export const openApiSpec = {
             maximum: 100000,
             example: 50,
           },
+          city: {
+            type: "string",
+            minLength: 2,
+            example: "Cairo",
+          },
+          area: {
+            type: "string",
+            minLength: 2,
+            example: "Maadi",
+          },
           status: {
             type: "string",
             enum: ["PUBLISHED", "DRAFT", "ARCHIVED"],
@@ -2593,6 +2603,14 @@ export const openApiSpec = {
             type: "integer",
             minimum: 1,
             maximum: 100000,
+          },
+          city: {
+            type: "string",
+            minLength: 2,
+          },
+          area: {
+            type: "string",
+            minLength: 2,
           },
           status: {
             type: "string",
@@ -2628,6 +2646,16 @@ export const openApiSpec = {
           assignedTimeCredits: {
             type: "integer",
             example: 50,
+          },
+          city: {
+            type: "string",
+            nullable: true,
+            example: "Cairo",
+          },
+          area: {
+            type: "string",
+            nullable: true,
+            example: "Maadi",
           },
           status: {
             type: "string",
