@@ -79,14 +79,14 @@ const request = async <T>(
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       // #region agent log
-      fetch('http://127.0.0.1:7430/ingest/c20838bf-9e24-484e-8317-a8bd52c8f7b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d357df'},body:JSON.stringify({sessionId:'d357df',location:'recommender.client.ts:fetch',message:'recommender fetch failed',data:{method,path,error:message},timestamp:Date.now(),hypothesisId:'H4'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7430/ingest/c20838bf-9e24-484e-8317-a8bd52c8f7b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d357df'},body:JSON.stringify({sessionId:'d357df',location:'recommender.client.ts:fetch',message:'recommender fetch failed',data:{method,path,error:message},timestamp:Date.now(),hypothesisId:'H4'}),signal:AbortSignal.timeout(300)}).catch(()=>{});
       // #endregion
       throw new RecommenderUnavailableError(message);
     }
 
     if (!response.ok) {
       // #region agent log
-      fetch('http://127.0.0.1:7430/ingest/c20838bf-9e24-484e-8317-a8bd52c8f7b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d357df'},body:JSON.stringify({sessionId:'d357df',location:'recommender.client.ts:request',message:'recommender HTTP error',data:{method,path,status:response.status},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7430/ingest/c20838bf-9e24-484e-8317-a8bd52c8f7b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d357df'},body:JSON.stringify({sessionId:'d357df',location:'recommender.client.ts:request',message:'recommender HTTP error',data:{method,path,status:response.status},timestamp:Date.now(),hypothesisId:'H3'}),signal:AbortSignal.timeout(300)}).catch(()=>{});
       // #endregion
       throw new RecommenderUnavailableError(
         `Recommender responded ${response.status}`,

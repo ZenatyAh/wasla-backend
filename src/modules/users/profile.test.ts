@@ -113,6 +113,7 @@ if (!hasTestDatabase) {
           consumer_id: consumerId,
           time_credits: 3,
           status: "COMPLETED",
+          maximum_end_date: new Date(),
           completed_at: new Date(),
         },
       });

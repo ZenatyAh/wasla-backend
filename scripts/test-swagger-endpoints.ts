@@ -329,7 +329,7 @@ async function main() {
     results.push(result);
 
     // #region agent log
-    fetch('http://127.0.0.1:7430/ingest/c20838bf-9e24-484e-8317-a8bd52c8f7b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d357df'},body:JSON.stringify({sessionId:'d357df',location:'test-swagger-endpoints.ts',message:'endpoint smoke result',data:result,timestamp:Date.now(),hypothesisId:result.ok?'pass':'fail'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7430/ingest/c20838bf-9e24-484e-8317-a8bd52c8f7b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'d357df'},body:JSON.stringify({sessionId:'d357df',location:'test-swagger-endpoints.ts',message:'endpoint smoke result',data:result,timestamp:Date.now(),hypothesisId:result.ok?'pass':'fail'}),signal:AbortSignal.timeout(300)}).catch(()=>{});
     // #endregion
   }
 
