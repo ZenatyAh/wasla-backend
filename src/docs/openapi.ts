@@ -1611,7 +1611,12 @@ export const openApiSpec = {
           content: {
             "application/json": {
               schema: { $ref: "#/components/schemas/CreateExchangeRequest" },
-              example: { postId: 1, providerId: 2, duration: 3 },
+              example: {
+                postId: 1,
+                providerId: 2,
+                duration: 3,
+                contractEndDate: "2026-07-01T00:00:00.000Z",
+              },
             },
           },
         },
@@ -1953,6 +1958,143 @@ export const openApiSpec = {
           "403": { $ref: "#/components/responses/Forbidden" },
           "404": { description: "Exchange not found" },
         },
+      },
+    },
+    "/exchanges/{id}/sessions": {
+      get: {
+        tags: ["Exchanges"],
+        summary: "List all sessions for an exchange",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "List of sessions",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    sessions: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/Session" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["Exchanges"],
+        summary: "Log a new work session",
+        description: "Provider only. Logs hours worked.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "integer" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateSessionRequest" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Session created",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    session: { $ref: "#/components/schemas/Session" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/exchanges/{id}/sessions/{sessionId}/confirm": {
+      put: {
+        tags: ["Exchanges"],
+        summary: "Confirm a work session",
+        description: "Requester only. Approves logged hours.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          { name: "sessionId", in: "path", required: true, schema: { type: "integer" } },
+        ],
+        responses: { "200": { description: "Session confirmed" } },
+      },
+    },
+    "/exchanges/{id}/sessions/{sessionId}/reject": {
+      put: {
+        tags: ["Exchanges"],
+        summary: "Reject a work session",
+        description: "Requester only.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "integer" } },
+          { name: "sessionId", in: "path", required: true, schema: { type: "integer" } },
+        ],
+        responses: { "200": { description: "Session rejected" } },
+      },
+    },
+    "/exchanges/{id}/deadline": {
+      post: {
+        tags: ["Exchanges"],
+        summary: "Propose a new deadline",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "integer" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ProposeDeadlineRequest" },
+            },
+          },
+        },
+        responses: { "200": { description: "Deadline proposed" } },
+      },
+    },
+    "/exchanges/{id}/deadline/approve": {
+      put: {
+        tags: ["Exchanges"],
+        summary: "Approve a proposed deadline",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "integer" } },
+        ],
+        responses: { "200": { description: "Deadline approved" } },
+      },
+    },
+    "/exchanges/{id}/deadline/reject": {
+      put: {
+        tags: ["Exchanges"],
+        summary: "Reject a proposed deadline",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "integer" } },
+        ],
+        responses: { "200": { description: "Deadline rejected" } },
       },
     },
     "/api/v1/wallet/history": {
@@ -2528,6 +2670,33 @@ export const openApiSpec = {
           },
         },
         required: ["query", "count", "source", "results"],
+      },
+      Session: {
+        type: "object",
+        properties: {
+          id: { type: "integer", example: 1 },
+          exchangeId: { type: "integer", example: 1 },
+          hours: { type: "integer", example: 2 },
+          notes: { type: "string", nullable: true, example: "Worked on UI" },
+          status: { type: "string", example: "PENDING_CONFIRMATION" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      CreateSessionRequest: {
+        type: "object",
+        required: ["hours"],
+        properties: {
+          hours: { type: "integer", minimum: 1, example: 2 },
+          notes: { type: "string", example: "Did some work" },
+        },
+      },
+      ProposeDeadlineRequest: {
+        type: "object",
+        required: ["proposedEndDate"],
+        properties: {
+          proposedEndDate: { type: "string", format: "date-time" },
+        },
       },
       CreatePostRequest: {
         type: "object",
@@ -3230,7 +3399,7 @@ export const openApiSpec = {
       },
       CreateExchangeRequest: {
         type: "object",
-        required: ["postId", "providerId", "duration"],
+        required: ["postId", "providerId", "duration", "contractEndDate"],
         properties: {
           postId: { type: "integer", example: 1 },
           providerId: { type: "integer", example: 2 },
@@ -3240,6 +3409,13 @@ export const openApiSpec = {
             maximum: 100000,
             description: "Number of time credits the service costs",
             example: 3,
+          },
+          contractEndDate: {
+            type: "string",
+            format: "date-time",
+            description:
+              "Agreed contract deadline. Must be strictly in the future. Legacy alias: maximumEndDate",
+            example: "2026-07-01T00:00:00.000Z",
           },
         },
       },
@@ -3251,6 +3427,17 @@ export const openApiSpec = {
           requesterId: { type: "integer", example: 1 },
           providerId: { type: "integer", example: 2 },
           duration: { type: "integer", example: 3 },
+          contractEndDate: {
+            type: "string",
+            format: "date-time",
+            description: "Agreed contract deadline",
+          },
+          proposedEndDate: {
+            type: "string",
+            format: "date-time",
+            nullable: true,
+            description: "Pending deadline extension proposed by the provider",
+          },
           status: { $ref: "#/components/schemas/ExchangeStatus" },
           escrowStatus: { $ref: "#/components/schemas/EscrowStatus" },
           acceptedAt: { type: "string", format: "date-time", nullable: true },

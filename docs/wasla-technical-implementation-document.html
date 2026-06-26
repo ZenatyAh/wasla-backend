@@ -1,0 +1,1779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Wasla Technical Implementation Document</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm 18mm 22mm 18mm;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.55;
+      color: #1a1a1a;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    .cover {
+      page-break-after: always;
+      min-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 2rem 0;
+    }
+    .cover h1 {
+      font-size: 28pt;
+      margin-bottom: 0.5rem;
+      color: #0f172a;
+      border: none;
+    }
+    .cover .subtitle {
+      font-size: 13pt;
+      color: #475569;
+      margin-bottom: 2rem;
+    }
+    .cover .meta {
+      font-size: 11pt;
+      color: #334155;
+      line-height: 1.8;
+    }
+    .toc {
+      page-break-after: always;
+      padding-top: 1rem;
+    }
+    .toc h2 {
+      font-size: 18pt;
+      border-bottom: 2px solid #2563eb;
+      padding-bottom: 0.4rem;
+    }
+    .toc ol {
+      font-size: 11pt;
+      line-height: 1.9;
+    }
+    h1 {
+      font-size: 20pt;
+      color: #0f172a;
+      border-bottom: 2px solid #2563eb;
+      padding-bottom: 0.35rem;
+      margin-top: 2rem;
+      page-break-before: always;
+    }
+    h1:first-of-type { page-break-before: auto; }
+    h2 {
+      font-size: 13pt;
+      color: #1e40af;
+      margin-top: 1.4rem;
+      border-left: 4px solid #2563eb;
+      padding-left: 0.6rem;
+    }
+    h3 {
+      font-size: 11pt;
+      color: #334155;
+      margin-top: 1rem;
+    }
+    p { margin: 0.45rem 0; }
+    hr {
+      border: none;
+      border-top: 1px solid #e2e8f0;
+      margin: 1.2rem 0;
+    }
+    code {
+      font-family: "Consolas", "Monaco", "Courier New", monospace;
+      font-size: 9pt;
+      background: #f1f5f9;
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+    }
+    pre {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 0.8rem 1rem;
+      overflow-x: auto;
+      page-break-inside: avoid;
+      margin: 0.7rem 0 1rem;
+    }
+    pre code {
+      background: transparent;
+      padding: 0;
+      font-size: 8.5pt;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.8rem 0 1rem;
+      font-size: 9.5pt;
+      page-break-inside: avoid;
+    }
+    table.data-table th,
+    table.data-table td {
+      border: 1px solid #cbd5e1;
+      padding: 0.45rem 0.55rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    table.data-table th {
+      background: #eff6ff;
+      font-weight: 600;
+    }
+    ul, ol {
+      margin: 0.35rem 0 0.6rem 1.2rem;
+      padding: 0;
+    }
+    li { margin: 0.2rem 0; }
+    .content { padding-top: 0.5rem; }
+    .footer-note {
+      margin-top: 2rem;
+      font-size: 9pt;
+      color: #64748b;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <h1>Wasla Platform</h1>
+    <div class="subtitle">Technical Implementation Document</div>
+    <div class="meta">
+      <strong>Graduation Project — Software Engineering</strong><br/>
+      Backend Repository Analysis: wasla-backend<br/>
+      Stack: Next.js · Express · PostgreSQL · Prisma · FastAPI · JWT · Socket.IO
+    </div>
+  </section>
+
+  <section class="toc">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li>User Login</li>
+      <li>User Registration</li>
+      <li>Create Post</li>
+      <li>View Home Feed</li>
+      <li>View Post Details</li>
+      <li>Apply to Post</li>
+      <li>Contact Post Owner</li>
+      <li>Create Service Contract</li>
+      <li>Record Work Session</li>
+      <li>Resolve Contract at Maximum End Date</li>
+      <li>View Recommended Posts</li>
+      <li>Appendix A — System Architecture Summary</li>
+    </ol>
+  </section>
+
+  <section class="content">
+    <h1>Wasla Platform — Technical Implementation Document</h1>
+
+<p><strong>Graduation Project — Software Engineering</strong></p>
+
+<p><strong>System Stack:</strong> Next.js (Frontend) · Node.js / Express / TypeScript (Backend) · PostgreSQL / Prisma (Database) · FastAPI / Sentence Transformers / FAISS (AI Service) · JWT + Refresh Tokens (Authentication) · Socket.IO (Real-Time Communication)</p>
+
+<p><strong>Document Scope:</strong> This document describes the *actual* implementation of eleven core use cases as found in the Wasla backend repository (<code>wasla-backend</code>). All flows, modules, and code references correspond to production source code, not generic textbook patterns.</p>
+
+<hr/>
+
+<h2>Table of Contents</h2>
+
+<ol start="1"><li>1. [User Login](#1-user-login)</li></ol>
+<ol start="2"><li>2. [User Registration](#2-user-registration)</li></ol>
+<ol start="3"><li>3. [Create Post](#3-create-post)</li></ol>
+<ol start="4"><li>4. [View Home Feed](#4-view-home-feed)</li></ol>
+<ol start="5"><li>5. [View Post Details](#5-view-post-details)</li></ol>
+<ol start="6"><li>6. [Apply to Post](#6-apply-to-post)</li></ol>
+<ol start="7"><li>7. [Contact Post Owner](#7-contact-post-owner)</li></ol>
+<ol start="8"><li>8. [Create Service Contract](#8-create-service-contract)</li></ol>
+<ol start="9"><li>9. [Record Work Session](#9-record-work-session)</li></ol>
+<ol start="10"><li>10. [Resolve Contract at Maximum End Date](#10-resolve-contract-at-maximum-end-date)</li></ol>
+<ol start="11"><li>11. [View Recommended Posts](#11-view-recommended-posts)</li></ol>
+
+<hr/>
+
+<h1>1. User Login</h1>
+
+<h2>1.1 Purpose</h2>
+
+<p>The User Login use case authenticates an existing Wasla user by verifying email and password credentials, establishes a server-side session record, and returns a short-lived JWT access token together with a long-lived refresh token. The access token authorizes subsequent REST API calls; the refresh token enables silent session renewal without re-entering credentials.</p>
+
+<h2>1.2 Actors</h2>
+
+<table class="data-table">
+<tr><th>Actor</th><th>Role</th></tr>
+<tr><td>-------</td><td>------</td></tr>
+<tr><td><strong>Registered User</strong></td><td>Submits login credentials via the Next.js frontend</td></tr>
+<tr><td><strong>Frontend Application</strong></td><td>Sends <code>POST /auth/login</code>, stores <code>accessToken</code> in memory/state, relies on httpOnly cookie for refresh</td></tr>
+<tr><td><strong>Auth Module</strong></td><td>Express routes, controller, and service under <code>src/modules/auth/</code></td></tr>
+<tr><td><strong>PostgreSQL (via Prisma)</strong></td><td>Stores <code>User</code> and <code>Session</code> entities</td></tr>
+<tr><td><strong>JWT Subsystem</strong></td><td>Signs and verifies access/refresh tokens (<code>src/common/utils/jwt.ts</code>)</td></tr>
+</table>
+
+<h2>1.3 Preconditions</h2>
+
+<ul><li>The user account exists in the <code>users</code> table with a valid <code>password_hash</code>.</li></ul>
+<ul><li>The account has not been soft-deleted (<code>deleted_at IS NULL</code>).</li></ul>
+<ul><li>The client can reach the backend API and send JSON request bodies with CORS credentials enabled.</li></ul>
+
+<h2>1.4 Trigger</h2>
+
+<p>The user submits the login form on the frontend, which issues:</p>
+
+<pre><code>POST /auth/login
+Content-Type: application/json
+
+{ "email": "...", "password": "..." }</code></pre>
+
+<h2>1.5 Implementation Flow</h2>
+
+<ol start="1"><li>1. <strong>Rate limiting</strong> — <code>loginLimite(5, 60_000)</code> in <code>auth.routes.ts</code> restricts each IP to five login attempts per minute, returning HTTP 429 when exceeded.</li></ol>
+<ol start="2"><li>2. <strong>Request validation</strong> — The <code>validate(loginschema)</code> middleware parses the body with Zod (<code>emailSchema</code>, <code>passwordSchema</code>). Invalid payloads return HTTP 400 with structured field errors.</li></ol>
+<ol start="3"><li>3. <strong>Controller orchestration</strong> — <code>loginController</code> extracts device metadata via <code>metaExtract(req)</code> (User-Agent parsing and client IP from <code>x-forwarded-for</code>), then delegates to <code>loginService</code>.</li></ol>
+<ol start="4"><li>4. <strong>Credential verification</strong> — <code>loginService</code> loads the user by email, rejects missing or soft-deleted accounts with a generic <code>"Invalid credentials"</code> message (preventing user enumeration), and compares the plaintext password against <code>password_hash</code> using <code>bcrypt.compare</code>.</li></ol>
+<ol start="5"><li>5. <strong>Session creation</strong> — On success, <code>createSession(userId, meta)</code> generates JWT access (15 min) and refresh (7 days) tokens, persists a <code>Session</code> row with UUID primary key, refresh token, expiry, device info, and IP address.</li></ol>
+<ol start="6"><li>6. <strong>Response assembly</strong> — The controller sets the refresh token as an httpOnly cookie via <code>setRefreshTokenCookie</code> and returns JSON <code>{ accessToken, user: { id, email, username } }</code>.</li></ol>
+
+<p>Architecturally, login follows a <strong>thin controller / fat service</strong> pattern with middleware-based cross-cutting concerns (validation, rate limiting).</p>
+
+<h2>1.6 Business Rules</h2>
+
+<ul><li>Email and password are mandatory at the service layer even after Zod validation.</li></ul>
+<ul><li>Invalid email/password combinations always yield the same error message.</li></ul>
+<ul><li>Email verification (<code>is_verified</code>) exists on the <code>User</code> model but the login check is currently commented out in <code>login.service.ts</code>.</li></ul>
+<ul><li>Password must satisfy complexity rules enforced at registration/login schema level (minimum 8 characters, uppercase, lowercase, digit, special character).</li></ul>
+
+<h2>1.7 Database Operations</h2>
+
+<table class="data-table">
+<tr><th>Operation</th><th>Entity</th><th>Prisma Call</th></tr>
+<tr><td>-----------</td><td>--------</td><td>-------------</td></tr>
+<tr><td><strong>Read</strong></td><td><code>User</code></td><td><code>prisma.user.findUnique({ where: { email } })</code></td></tr>
+<tr><td><strong>Create</strong></td><td><code>Session</code></td><td><code>prisma.session.create({ data: { id, user_id, refresh_token, expires_at, device_info, ip_address } })</code></td></tr>
+</table>
+
+<p>No updates or deletes occur during login.</p>
+
+<h2>1.8 Security Considerations</h2>
+
+<ul><li><strong>Password storage:</strong> bcrypt with cost factor 10 (applied at registration).</li></ul>
+<ul><li><strong>Token separation:</strong> Access token in JSON body; refresh token in httpOnly cookie (<code>secure</code> in production, <code>sameSite: "none"</code> in production for cross-origin SPA support).</li></ul>
+<ul><li><strong>Rate limiting:</strong> Mitigates brute-force attacks on <code>/auth/login</code>.</li></ul>
+<ul><li><strong>Generic error messages:</strong> Prevents distinguishing between unknown email and wrong password.</li></ul>
+<ul><li><strong>Soft-delete enforcement:</strong> Deleted users cannot authenticate.</li></ul>
+<ul><li><strong>Trust proxy:</strong> <code>app.set("trust proxy", 1)</code> ensures correct client IP behind reverse proxies for session metadata.</li></ul>
+
+<h2>1.9 Error Handling</h2>
+
+<table class="data-table">
+<tr><th>Condition</th><th>HTTP Status</th><th>Response Shape</th></tr>
+<tr><td>-----------</td><td>-------------</td><td>----------------</td></tr>
+<tr><td>Zod validation failure</td><td>400</td><td><code>{ status: "fail", errors: [{ path, message }] }</code></td></tr>
+<tr><td>Invalid credentials</td><td>400</td><td><code>{ status: "fail", message: "Invalid credentials" }</code></td></tr>
+<tr><td>Session creation failure</td><td>400</td><td><code>{ status: "fail", message: "Session creation failed" }</code></td></tr>
+<tr><td>Rate limit exceeded</td><td>429</td><td><code>{ status: "fail", message: "Too many login attempts..." }</code></td></tr>
+<tr><td>Malformed JSON body</td><td>400</td><td><code>{ message: "Invalid JSON request body" }</code></td></tr>
+</table>
+
+<p>Controllers use <code>sendError</code> from <code>httpError.ts</code> for consistent failure responses.</p>
+
+<h2>1.10 Code References</h2>
+
+<p><strong>Snippet 1 — Route definition with middleware chain</strong></p>
+
+<p>*File:* <code>src/modules/auth/auth.routes.ts</code></p>
+
+<pre><code class="language-typescript">router.post(
+  "/login",
+  loginLimite(5, 60 * 1000),
+  validate(loginschema),
+  loginController,
+);</code></pre>
+
+<p>This snippet defines the public login endpoint mounted at <code>/auth/login</code>. Rate limiting runs first, then Zod validation, then the controller. No authentication middleware is applied because the user is not yet authenticated.</p>
+
+<p><strong>Snippet 2 — Login controller and token delivery</strong></p>
+
+<p>*File:* <code>src/modules/auth/auth.controller.ts</code></p>
+
+<pre><code class="language-typescript">export const loginController = async (req: Request, res: Response) =&gt; {
+  try {
+    const meta = await metaExtract(req);
+    const result = await loginService(req.body, meta);
+    setRefreshTokenCookie(res, result.refreshToken);
+
+    return res.json({
+      accessToken: result.accessToken,
+      user: result.user,
+    });
+  } catch (err: unknown) {
+    return sendError(res, 400, getErrorMessage(err, "Login failed"));
+  }
+};</code></pre>
+
+<p>The controller separates transport concerns (cookie setting, JSON response) from business logic. The refresh token never appears in the JSON body, reducing XSS exposure.</p>
+
+<p><strong>Snippet 3 — Credential verification and session bootstrap</strong></p>
+
+<p>*File:* <code>src/modules/auth/login.service.ts</code></p>
+
+<pre><code class="language-typescript">const user = await prisma.user.findUnique({
+  where: { email },
+});
+
+if (!user || user.deleted_at) {
+  throw new Error(`Invalid credentials`);
+}
+
+const isVaild = await bcrypt.compare(password, user.password_hash);
+if (!isVaild) {
+  throw new Error(`Invalid credentials`);
+}
+
+const { refreshToken, accessToken } = await createSession(user.id, meta);</code></pre>
+
+<p>This is the core authentication gate. Both missing users and incorrect passwords produce identical errors. Successful authentication delegates session persistence to <code>createSession</code>.</p>
+
+<p><strong>Snippet 4 — Session and JWT creation</strong></p>
+
+<p>*File:* <code>src/modules/auth/register/create_session.ts</code></p>
+
+<pre><code class="language-typescript">const refreshToken = RefreshAccessToken(userId.toString());
+const accessToken = signAccessToken(userId.toString());
+await prisma.session.create({
+  data: {
+    id: uuidv4(),
+    user_id: userId,
+    refresh_token: refreshToken,
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    device_info: meta.deviceInfo,
+    ip_address: meta.ip,
+  },
+});
+return { refreshToken, accessToken };</code></pre>
+
+<p>Each login creates a new session row, enabling multi-device support and refresh token rotation on subsequent <code>/auth/refresh</code> calls.</p>
+
+<hr/>
+
+<h1>2. User Registration</h1>
+
+<h2>2.1 Purpose</h2>
+
+<p>User Registration onboards a new participant into the Wasla time-credit exchange platform. It creates a user profile, associates skill tags for the AI recommender, grants an initial welcome bonus of five time credits, establishes an authenticated session, and synchronizes the new user vector to the FastAPI recommender service.</p>
+
+<h2>2.2 Actors</h2>
+
+<table class="data-table">
+<tr><th>Actor</th><th>Role</th></tr>
+<tr><td>-------</td><td>------</td></tr>
+<tr><td><strong>Prospective User</strong></td><td>Completes the registration form on the frontend</td></tr>
+<tr><td><strong>Auth Module</strong></td><td><code>RegisterControler</code>, <code>RegisterService</code>, validation schemas</td></tr>
+<tr><td><strong>Skills Module</strong></td><td><code>syncUserSkillsByType</code> links offered/required skills</td></tr>
+<tr><td><strong>Wallet Subsystem</strong></td><td>Creates <code>WELCOME_BONUS</code> transaction</td></tr>
+<tr><td><strong>AI Recommender Service</strong></td><td>Receives user profile sync via <code>POST /sync/user</code></td></tr>
+<tr><td><strong>PostgreSQL</strong></td><td>Persists <code>User</code>, <code>UserSkill</code>, <code>Skill</code>, <code>Transaction</code>, <code>Session</code></td></tr>
+</table>
+
+<h2>2.3 Preconditions</h2>
+
+<ul><li>Email and username are not already registered.</li></ul>
+<ul><li>The client submits all required registration fields including at least one offered skill and one required skill.</li></ul>
+<ul><li>The recommender service may be offline; registration succeeds regardless (sync is fire-and-forget).</li></ul>
+
+<h2>2.4 Trigger</h2>
+
+<pre><code>POST /auth/register
+Content-Type: application/json
+
+{
+  "full_name", "username", "email", "password",
+  "bio?", "profile_image?", "location?",
+  "offeredSkills": ["..."],
+  "requiredSkills": ["..."]
+}</code></pre>
+
+<h2>2.5 Implementation Flow</h2>
+
+<ol start="1"><li>1. <strong>Validation</strong> — <code>validate(registerSchema)</code> enforces name/username/email/password rules and skill array constraints (1–10 unique items, minimum 2 characters each).</li></ol>
+<ol start="2"><li>2. <strong>Uniqueness checks</strong> — <code>RegisterService</code> queries <code>User</code> by email and username independently before any write.</li></ol>
+<ol start="3"><li>3. <strong>Password hashing</strong> — <code>bcrypt.hash(password, 10)</code> produces <code>password_hash</code>.</li></ol>
+<ol start="4"><li>4. <strong>Atomic transaction</strong> — A Prisma <code>$transaction</code> (15 s timeout) creates the user, syncs skills of type <code>OFFER</code> and <code>REQUEST</code>, and records a welcome bonus transaction crediting five time credits.</li></ol>
+<ol start="5"><li>5. <strong>Session creation</strong> — <code>createSession</code> issues JWT pair and persists session metadata (same path as login).</li></ol>
+<ol start="6"><li>6. <strong>Recommender sync</strong> — <code>syncUser(user.id)</code> is invoked asynchronously to index the user in the FAISS-based recommender.</li></ol>
+<ol start="7"><li>7. <strong>Response</strong> — Controller sets refresh cookie and returns <code>{ accessToken, user: { id, email, username } }</code>.</li></ol>
+
+<p>Design decision: registration immediately authenticates the user (no separate login step), reducing onboarding friction.</p>
+
+<h2>2.6 Business Rules</h2>
+
+<ul><li>Username must contain at least three English letters; Arabic letters allowed in full name only.</li></ul>
+<ul><li>Bio, if provided, must be 50–200 characters.</li></ul>
+<ul><li>Profile image must be a valid URL when supplied.</li></ul>
+<ul><li>Duplicate emails or usernames are rejected before the transaction begins.</li></ul>
+<ul><li>Welcome bonus: <code>amount: 5</code>, <code>transaction_type: "WELCOME_BONUS"</code>, <code>sender_id: null</code>.</li></ul>
+<ul><li>Skills are deduplicated at schema level and upserted into the <code>skills</code> / <code>user_skills</code> tables.</li></ul>
+
+<h2>2.7 Database Operations</h2>
+
+<table class="data-table">
+<tr><th>Operation</th><th>Entity</th><th>Details</th></tr>
+<tr><td>-----------</td><td>--------</td><td>---------</td></tr>
+<tr><td><strong>Read</strong></td><td><code>User</code></td><td>Uniqueness checks for email and username</td></tr>
+<tr><td><strong>Create</strong></td><td><code>User</code></td><td>Profile fields and hashed password</td></tr>
+<tr><td><strong>Create/Upsert</strong></td><td><code>Skill</code>, <code>UserSkill</code></td><td>Via <code>syncUserSkillsByType</code> inside transaction</td></tr>
+<tr><td><strong>Create</strong></td><td><code>Transaction</code></td><td>Welcome bonus credit</td></tr>
+<tr><td><strong>Create</strong></td><td><code>Session</code></td><td>Via <code>createSession</code> after transaction</td></tr>
+</table>
+
+<h2>2.8 Security Considerations</h2>
+
+<ul><li>Strong password policy enforced by Zod regex rules.</li></ul>
+<ul><li>Password never stored in plaintext; only bcrypt hash persisted.</li></ul>
+<ul><li>Registration endpoint is <strong>not</strong> rate-limited (unlike login) — a potential hardening target.</li></ul>
+<ul><li>Immediate session issuance follows the same secure cookie pattern as login.</li></ul>
+<ul><li>Input sanitization via Zod <code>trim()</code> on string fields.</li></ul>
+
+<h2>2.9 Error Handling</h2>
+
+<table class="data-table">
+<tr><th>Condition</th><th>HTTP Status</th><th>Message</th></tr>
+<tr><td>-----------</td><td>-------------</td><td>---------</td></tr>
+<tr><td>Zod validation failure</td><td>400</td><td>Structured field errors</td></tr>
+<tr><td>Duplicate email</td><td>400</td><td><code>"Email already used"</code></td></tr>
+<tr><td>Duplicate username</td><td>400</td><td><code>"Username is already taken"</code></td></tr>
+<tr><td>Transaction timeout/failure</td><td>400</td><td><code>"Register failed"</code></td></tr>
+<tr><td>Missing request body</td><td>400</td><td><code>"Request body is required"</code></td></tr>
+</table>
+
+<h2>2.10 Code References</h2>
+
+<p><strong>Snippet 1 — Registration validation schema</strong></p>
+
+<p>*File:* <code>src/modules/auth/auth.schema.ts</code></p>
+
+<pre><code class="language-typescript">export const registerSchema = z.object({
+  full_name: z.string().min(3).max(100).regex(/^[a-zA-Z\u0600-\u06FF\s]+$/),
+  username: z.string().trim().min(3).max(50).regex(/^(?=(.*[a-zA-Z]){3,})[a-zA-Z0-9\d\W_]+$/),
+  email: emailSchema,
+  password: passwordSchema,
+  bio: z.string().min(50).max(200).optional().or(z.literal("")),
+  profile_image: z.string().url().optional(),
+  location: z.string().min(3).optional(),
+  offeredSkills: userSkillsArraySchema,
+  requiredSkills: userSkillsArraySchema,
+});</code></pre>
+
+<p>This schema is the single source of truth for registration input validation, shared between runtime middleware and OpenAPI documentation.</p>
+
+<p><strong>Snippet 2 — Atomic user creation with skills and welcome bonus</strong></p>
+
+<p>*File:* <code>src/modules/auth/register/register.service.ts</code></p>
+
+<pre><code class="language-typescript">const user = await prisma.$transaction(async (tx) =&gt; {
+  const user = await tx.user.create({
+    data: { full_name, username, email, password_hash: hashPassword, ... },
+  });
+
+  await syncUserSkillsByType(tx, user.id, offeredSkills, "OFFER");
+  await syncUserSkillsByType(tx, user.id, requiredSkills, "REQUEST");
+
+  await tx.transaction.create({
+    data: {
+      receiver_id: user.id,
+      sender_id: null,
+      amount: 5,
+      transaction_type: "WELCOME_BONUS",
+    },
+  });
+
+  return user;
+}, { timeout: 15000 });</code></pre>
+
+<p>The transaction ensures that a user is never created without skills and initial credits, maintaining data consistency.</p>
+
+<p><strong>Snippet 3 — Post-registration session and AI sync</strong></p>
+
+<p>*File:* <code>src/modules/auth/register/register.service.ts</code></p>
+
+<pre><code class="language-typescript">const { refreshToken, accessToken } = await createSession(user.id, meta);
+syncUser(user.id);
+return { id: user.id, email: user.email, username: user.username, refreshToken, accessToken };</code></pre>
+
+<p><code>syncUser</code> calls the FastAPI recommender (<code>POST /sync/user</code>) without blocking the HTTP response, following an eventual-consistency model for the AI index.</p>
+
+<p><strong>Snippet 4 — Registration controller response</strong></p>
+
+<p>*File:* <code>src/modules/auth/register/register.controller.ts</code></p>
+
+<pre><code class="language-typescript">const { id, email, username, refreshToken, accessToken } =
+  await RegisterService(data, meta);
+
+setRefreshTokenCookie(res, refreshToken);
+
+return res.json({
+  accessToken,
+  user: { id, email, username },
+});</code></pre>
+
+<hr/>
+
+<h1>3. Create Post</h1>
+
+<h2>3.1 Purpose</h2>
+
+<p>Create Post allows an authenticated user to publish a service offer or request on the Wasla marketplace. Each post defines title, description, category (<code>OFFER</code> or <code>REQUEST</code>), service mode (<code>ONLINE</code> or <code>OFFLINE</code>), assigned time credits, optional geographic fields, and publication status. Upon creation, the post is indexed in the AI recommender for personalized feed generation.</p>
+
+<h2>3.2 Actors</h2>
+
+<table class="data-table">
+<tr><th>Actor</th><th>Role</th></tr>
+<tr><td>-------</td><td>------</td></tr>
+<tr><td><strong>Authenticated User</strong></td><td>Post author</td></tr>
+<tr><td><strong>Posts Module</strong></td><td>Routes, controller, service, schemas under <code>src/modules/posts/</code></td></tr>
+<tr><td><strong>AI Recommender Service</strong></td><td>Receives post embedding via <code>syncPost</code> → <code>POST /sync/post</code></td></tr>
+<tr><td><strong>PostgreSQL</strong></td><td><code>Post</code> entity with related <code>User</code></td></tr>
+</table>
+
+<h2>3.3 Preconditions</h2>
+
+<ul><li>Valid JWT access token in <code>Authorization: Bearer</code> header.</li></ul>
+<ul><li>Request body passes <code>createPostSchema</code> validation.</li></ul>
+<ul><li>For <code>OFFLINE</code> service mode, both <code>city</code> and <code>area</code> must be provided.</li></ul>
+
+<h2>3.4 Trigger</h2>
+
+<pre><code>POST /posts
+Authorization: Bearer &lt;accessToken&gt;
+Content-Type: application/json</code></pre>
+
+<h2>3.5 Implementation Flow</h2>
+
+<ol start="1"><li>1. <strong>Authentication</strong> — <code>authMiddleware</code> verifies JWT and attaches <code>req.user.userId</code>.</li></ol>
+<ol start="2"><li>2. <strong>Validation</strong> — <code>validate(createPostSchema)</code> enforces field lengths, enums, and offline location requirement.</li></ol>
+<ol start="3"><li>3. <strong>Controller</strong> — <code>createPostController</code> extracts numeric user ID via <code>getUserId(req)</code> and passes validated body to the service.</li></ol>
+<ol start="4"><li>4. <strong>Persistence</strong> — <code>createPostService</code> inserts a <code>Post</code> row with snake_case column mapping (<code>service_mode</code>, <code>assigned_time_credits</code>, etc.).</li></ol>
+<ol start="5"><li>5. <strong>Response mapping</strong> — <code>toPostResponse</code> converts database record to camelCase API shape including nested author <code>user</code> object.</li></ol>
+<ol start="6"><li>6. <strong>AI indexing</strong> — <code>syncPost(post.id)</code> fire-and-forgets a recommender sync call.</li></ol>
+<ol start="7"><li>7. <strong>Response</strong> — HTTP 201 with <code>{ post }</code>.</li></ol>
+
+<p>Route ordering in <code>posts.routes.ts</code> places <code>GET /</code> (public feed) before <code>authMiddleware</code>, while <code>POST /</code> requires authentication.</p>
+
+<h2>3.6 Business Rules</h2>
+
+<ul><li>Title: 5–200 characters; description: 10–5000 characters.</li></ul>
+<ul><li><code>assignedTimeCredits</code>: positive integer, max 100,000.</li></ul>
+<ul><li>Default status is <code>PUBLISHED</code> (Prisma schema default) unless client specifies <code>DRAFT</code> or <code>ARCHIVED</code>.</li></ul>
+<ul><li>Offline posts require geographic fields; online posts may omit them.</li></ul>
+<ul><li>Only the authenticated user's ID is stored as <code>user_id</code>; no impersonation path exists.</li></ul>
+
+<h2>3.7 Database Operations</h2>
+
+<table class="data-table">
+<tr><th>Operation</th><th>Entity</th><th>Prisma Call</th></tr>
+<tr><td>-----------</td><td>--------</td><td>-------------</td></tr>
+<tr><td><strong>Create</strong></td><td><code>Post</code></td><td><code>prisma.post.create({ data: { user_id, title, description, category, service_mode, assigned_time_credits, status, city, area }, select: postSelect })</code></td></tr>
+</table>
+
+<p><code>postSelect</code> joins author profile fields (<code>username</code>, <code>full_name</code>, <code>profile_image</code>).</p>
+
+<h2>3.8 Security Considerations</h2>
+
+<ul><li>JWT authentication required; unauthenticated requests receive 401.</li></ul>
+<ul><li>User ID derived from token, not from request body — prevents author spoofing.</li></ul>
+<ul><li>Input validation prevents oversized payloads and invalid enum injection.</li></ul>
+<ul><li>Post content is stored as provided; no server-side HTML sanitization layer is present.</li></ul>
+
+<h2>3.9 Error Handling</h2>
+
+<table class="data-table">
+<tr><th>Condition</th><th>HTTP Status</th><th>Message</th></tr>
+<tr><td>-----------</td><td>-------------</td><td>---------</td></tr>
+<tr><td>Missing/invalid token</td><td>401</td><td><code>"Unauthorized"</code></td></tr>
+<tr><td>Zod validation failure</td><td>400</td><td>Structured field errors</td></tr>
+<tr><td>Database error</td><td>400</td><td><code>"Create post failed"</code></td></tr>
+</table>
+
+<h2>3.10 Code References</h2>
+
+<p><strong>Snippet 1 — Route and middleware</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.routes.ts</code></p>
+
+<pre><code class="language-typescript">router.get("/", listPublishedPostsController)
+router.use(authMiddleware)
+router.post("/", validate(createPostSchema), createPostController)</code></pre>
+
+<p>Public read access for the home feed is explicitly separated from authenticated write operations.</p>
+
+<p><strong>Snippet 2 — Create post service with recommender sync</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.service.ts</code></p>
+
+<pre><code class="language-typescript">export const createPostService = async (data: CreatePostInput, userId: number) =&gt; {
+  const post = await prisma.post.create({
+    data: {
+      user_id: userId,
+      title: data.title,
+      description: data.description,
+      category: data.category,
+      service_mode: data.serviceMode,
+      assigned_time_credits: data.assignedTimeCredits,
+      status: data.status,
+      city: data.city,
+      area: data.area,
+    },
+    select: postSelect,
+  })
+  syncPost(post.id)
+  return toPostResponse(post)
+}</code></pre>
+
+<p><strong>Snippet 3 — Offline location validation</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.schema.ts</code></p>
+
+<pre><code class="language-typescript">export const createPostSchema = baseCreatePostSchema.refine(
+  (data) =&gt; {
+    if (data.serviceMode === "OFFLINE") {
+      return !!data.city &amp;&amp; !!data.area;
+    }
+    return true;
+  },
+  { message: "City and Area are required for offline services", path: ["city"] }
+);</code></pre>
+
+<p><strong>Snippet 4 — Controller</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.controller.ts</code></p>
+
+<pre><code class="language-typescript">export const createPostController = async (req: Request, res: Response) =&gt; {
+  const userId = getUserId(req)
+  const data: CreatePostInput = req.body;
+  const post = await createPostService(data, userId);
+  return res.status(201).json({ post });
+};</code></pre>
+
+<hr/>
+
+<h1>4. View Home Feed</h1>
+
+<h2>4.1 Purpose</h2>
+
+<p>View Home Feed retrieves a paginated, chronologically ordered list of all published posts. This is the platform's public discovery feed, independent of user authentication or AI personalization. It serves as the default content stream and as the fallback when the recommender service is unavailable.</p>
+
+<h2>4.2 Actors</h2>
+
+<table class="data-table">
+<tr><th>Actor</th><th>Role</th></tr>
+<tr><td>-------</td><td>------</td></tr>
+<tr><td><strong>Visitor / Authenticated User</strong></td><td>Browses posts on the home page</td></tr>
+<tr><td><strong>Posts Module</strong></td><td><code>listPublishedPostsController</code>, <code>listPublishedPostsService</code></td></tr>
+<tr><td><strong>Pagination Utilities</strong></td><td><code>buildPostCursorFilter</code>, <code>paginateById</code></td></tr>
+<tr><td><strong>PostgreSQL</strong></td><td><code>Post</code> with <code>status = PUBLISHED</code></td></tr>
+</table>
+
+<h2>4.3 Preconditions</h2>
+
+<ul><li>No authentication required.</li></ul>
+<ul><li>Optional query parameters <code>cursor</code> and <code>limit</code> must conform to <code>listPostsQuerySchema</code> when provided.</li></ul>
+
+<h2>4.4 Trigger</h2>
+
+<pre><code>GET /posts?cursor=&lt;postId&gt;&amp;limit=20</code></pre>
+
+<h2>4.5 Implementation Flow</h2>
+
+<ol start="1"><li>1. <strong>Public route</strong> — <code>GET /</code> is registered before <code>authMiddleware</code> in <code>posts.routes.ts</code>, making the endpoint accessible without a token.</li></ol>
+<ol start="2"><li>2. <strong>Query parsing</strong> — Controller parses <code>req.query</code> with <code>listPostsQuerySchema</code> (default <code>limit: 20</code>, max 50).</li></ol>
+<ol start="3"><li>3. <strong>Cursor resolution</strong> — <code>buildPostCursorFilter(cursor)</code> loads the cursor post's <code>created_at</code> and <code>id</code>, then builds a keyset filter for <code>(created_at DESC, id DESC)</code> pagination.</li></ol>
+<ol start="4"><li>4. <strong>Database query</strong> — <code>prisma.post.findMany</code> fetches <code>limit + 1</code> published posts with <code>postSelect</code> (includes author profile).</li></ol>
+<ol start="5"><li>5. <strong>Pagination slicing</strong> — <code>paginateById</code> returns <code>limit</code> items and sets <code>nextCursor</code> to the last item's ID if more results exist.</li></ol>
+<ol start="6"><li>6. <strong>Response</strong> — <code>{ posts: [...], nextCursor: number | null }</code>.</li></ol>
+
+<p>Architectural pattern: <strong>cursor-based keyset pagination</strong> avoids OFFSET performance degradation on large datasets.</p>
+
+<h2>4.6 Business Rules</h2>
+
+<ul><li>Only posts with <code>status: "PUBLISHED"</code> appear in the feed.</li></ul>
+<ul><li>Ordering is strictly by <code>created_at DESC, id DESC</code>.</li></ul>
+<ul><li>Invalid or unknown cursor values are silently ignored (returns first page).</li></ul>
+<ul><li>Maximum page size is 50 posts.</li></ul>
+
+<h2>4.7 Database Operations</h2>
+
+<table class="data-table">
+<tr><th>Operation</th><th>Entity</th><th>Details</th></tr>
+<tr><td>-----------</td><td>--------</td><td>---------</td></tr>
+<tr><td><strong>Read</strong></td><td><code>Post</code></td><td>Cursor lookup + paginated <code>findMany</code> with author join</td></tr>
+<tr><td><strong>Read</strong></td><td><code>User</code></td><td>Via <code>postSelect.user</code> nested select</td></tr>
+</table>
+
+<p>No writes occur.</p>
+
+<h2>4.8 Security Considerations</h2>
+
+<ul><li>Public endpoint exposes only published posts.</li></ul>
+<ul><li>Draft and archived posts are excluded at the query level.</li></ul>
+<ul><li>No user-specific data beyond public author profiles is returned.</li></ul>
+
+<h2>4.9 Error Handling</h2>
+
+<table class="data-table">
+<tr><th>Condition</th><th>HTTP Status</th><th>Message</th></tr>
+<tr><td>-----------</td><td>-------------</td><td>---------</td></tr>
+<tr><td>Invalid query parameters</td><td>400</td><td><code>"Invalid request data"</code></td></tr>
+<tr><td>Database failure</td><td>400</td><td><code>"Fetch posts failed"</code></td></tr>
+</table>
+
+<h2>4.10 Code References</h2>
+
+<p><strong>Snippet 1 — Public route registration</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.routes.ts</code></p>
+
+<pre><code class="language-typescript">router.get("/", listPublishedPostsController)
+router.use(authMiddleware)</code></pre>
+
+<p><strong>Snippet 2 — Feed service with cursor pagination</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.service.ts</code></p>
+
+<pre><code class="language-typescript">export const listPublishedPostsService = async (query: ListPostsQuery) =&gt; {
+  const limit = query.limit ?? 20
+  const cursorFilter = await buildPostCursorFilter(query.cursor)
+
+  const posts = await prisma.post.findMany({
+    where: { status: "PUBLISHED", ...cursorFilter },
+    orderBy: [{ created_at: "desc" }, { id: "desc" }],
+    take: limit + 1,
+    select: postSelect,
+  })
+
+  const { items, nextCursor } = paginateById(posts, limit)
+  return { posts: items.map(toPostResponse), nextCursor }
+}</code></pre>
+
+<p><strong>Snippet 3 — Keyset cursor filter</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.pagination.ts</code></p>
+
+<pre><code class="language-typescript">return {
+  OR: [
+    { created_at: { lt: cursorPost.created_at } },
+    { AND: [{ created_at: cursorPost.created_at }, { id: { lt: cursorPost.id } }] },
+  ],
+};</code></pre>
+
+<p><strong>Snippet 4 — Pagination helper</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.pagination.ts</code></p>
+
+<pre><code class="language-typescript">export const paginateById = &lt;T extends { id: number }&gt;(items: T[], limit: number) =&gt; {
+  const hasMore = items.length &gt; limit;
+  const page = hasMore ? items.slice(0, limit) : items;
+  return { items: page, nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null };
+};</code></pre>
+
+<hr/>
+
+<h1>5. View Post Details</h1>
+
+<h2>5.1 Purpose</h2>
+
+<p>View Post Details retrieves the full representation of a single post, including author profile metadata. It enforces visibility rules so that non-published posts are accessible only to their owner, while published posts are visible to any authenticated user.</p>
+
+<h2>5.2 Actors</h2>
+
+<table class="data-table">
+<tr><th>Actor</th><th>Role</th></tr>
+<tr><td>-------</td><td>------</td></tr>
+<tr><td><strong>Authenticated User</strong></td><td>Views post detail page</td></tr>
+<tr><td><strong>Posts Module</strong></td><td><code>getPostByIdController</code>, <code>getPostByIdService</code></td></tr>
+<tr><td><strong>PostgreSQL</strong></td><td><code>Post</code>, <code>User</code></td></tr>
+</table>
+
+<h2>5.3 Preconditions</h2>
+
+<ul><li>Valid JWT access token.</li></ul>
+<ul><li><code>postId</code> path parameter is a positive integer (coerced by <code>postIdParamSchema</code>).</li></ul>
+
+<h2>5.4 Trigger</h2>
+
+<pre><code>GET /posts/:postId
+Authorization: Bearer &lt;accessToken&gt;</code></pre>
+
+<h2>5.5 Implementation Flow</h2>
+
+<ol start="1"><li>1. <strong>Authentication</strong> — <code>authMiddleware</code> validates JWT.</li></ol>
+<ol start="2"><li>2. <strong>Parameter validation</strong> — <code>validate(postIdParamSchema, "params")</code> coerces <code>postId</code> to a positive integer.</li></ol>
+<ol start="3"><li>3. <strong>Lookup</strong> — <code>getPostByIdService</code> performs <code>prisma.post.findUnique</code> with extended select including <code>user_id</code> and <code>status</code>.</li></ol>
+<ol start="4"><li>4. <strong>Access control</strong> — If post not found → error. If status is not <code>PUBLISHED</code> and caller is not the owner → <code>"You cannot view this post"</code>.</li></ol>
+<ol start="5"><li>5. <strong>Response</strong> — <code>{ post: toPostResponse(post) }</code>.</li></ol>
+
+<p>Unlike the home feed, post details require authentication even for published posts.</p>
+
+<h2>5.6 Business Rules</h2>
+
+<ul><li>Published posts: visible to all authenticated users.</li></ul>
+<ul><li>Draft/Archived posts: visible only to <code>post.user_id === callerId</code>.</li></ul>
+<ul><li>Missing posts return 404.</li></ul>
+
+<h2>5.7 Database Operations</h2>
+
+<table class="data-table">
+<tr><th>Operation</th><th>Entity</th><th>Details</th></tr>
+<tr><td>-----------</td><td>--------</td><td>---------</td></tr>
+<tr><td><strong>Read</strong></td><td><code>Post</code></td><td><code>findUnique</code> with <code>postSelect</code> + status + user_id</td></tr>
+<tr><td><strong>Read</strong></td><td><code>User</code></td><td>Nested author select</td></tr>
+</table>
+
+<h2>5.8 Security Considerations</h2>
+
+<ul><li>Authentication required for all detail views.</li></ul>
+<ul><li>Owner-only access for non-published content prevents draft leakage.</li></ul>
+<ul><li>Post ID validated as positive integer, preventing injection via path params.</li></ul>
+
+<h2>5.9 Error Handling</h2>
+
+<table class="data-table">
+<tr><th>Condition</th><th>HTTP Status</th><th>Message</th></tr>
+<tr><td>-----------</td><td>-------------</td><td>---------</td></tr>
+<tr><td>Unauthorized</td><td>401</td><td><code>"Unauthorized"</code></td></tr>
+<tr><td>Post not found</td><td>404</td><td><code>"Post not found"</code></td></tr>
+<tr><td>Access denied</td><td>404</td><td><code>"You cannot view this post"</code></td></tr>
+</table>
+
+<p>Note: Access denied returns 404 rather than 403, obscuring existence of private drafts.</p>
+
+<h2>5.10 Code References</h2>
+
+<p><strong>Snippet 1 — Route definition</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.routes.ts</code></p>
+
+<pre><code class="language-typescript">router.get("/:postId", validate(postIdParamSchema, "params"), getPostByIdController)</code></pre>
+
+<p><strong>Snippet 2 — Access control logic</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.service.ts</code></p>
+
+<pre><code class="language-typescript">export const getPostByIdService = async (postId: number, userId: number) =&gt; {
+  const post = await prisma.post.findUnique({
+    where: { id: postId },
+    select: { ...postSelect, user_id: true, status: true },
+  })
+  if (!post) {
+    throw new Error("Post not found")
+  }
+  if (post.status !== "PUBLISHED" &amp;&amp; post.user_id !== userId) {
+    throw new Error("You cannot view this post")
+  }
+  return toPostResponse(post)
+}</code></pre>
+
+<p><strong>Snippet 3 — Controller</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.controller.ts</code></p>
+
+<pre><code class="language-typescript">export const getPostByIdController = async (req: Request, res: Response) =&gt; {
+  const userId = getUserId(req)
+  const postId = req.params.postId as unknown as number;
+  const post = await getPostByIdService(postId, userId)
+  return res.json({ post })
+};</code></pre>
+
+<p><strong>Snippet 4 — Post ID param schema</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.schema.ts</code></p>
+
+<pre><code class="language-typescript">export const postIdParamSchema = z.object({
+  postId: z.coerce.number().int().positive(),
+});</code></pre>
+
+<hr/>
+
+<h1>6. Apply to Post</h1>
+
+<h2>6.1 Purpose</h2>
+
+<p>Apply to Post initiates a service exchange request against a published post. The requester proposes a duration in time credits and a maximum contract end date. The system validates credit availability, creates a pending <code>ServiceExchange</code> record (the platform's application/contract entity), notifies the provider, and records an interaction signal for the AI recommender.</p>
+
+<h2>6.2 Actors</h2>
+
+<table class="data-table">
+<tr><th>Actor</th><th>Role</th></tr>
+<tr><td>-------</td><td>------</td></tr>
+<tr><td><strong>Requester (Consumer)</strong></td><td>User applying for a service</td></tr>
+<tr><td><strong>Provider</strong></td><td>Post owner / service provider (receives notification)</td></tr>
+<tr><td><strong>Exchanges Module</strong></td><td><code>createExchangeController</code>, <code>requestExchange</code></td></tr>
+<tr><td><strong>Notifications Module</strong></td><td><code>createContractNotification</code></td></tr>
+<tr><td><strong>AI Recommender</strong></td><td>Receives <code>apply</code> interaction via <code>syncInteraction</code></td></tr>
+<tr><td><strong>PostgreSQL</strong></td><td><code>ServiceExchange</code>, <code>Post</code>, <code>User</code></td></tr>
+</table>
+
+<h2>6.3 Preconditions</h2>
+
+<ul><li>Requester is authenticated.</li></ul>
+<ul><li>Requester is not the provider (<code>providerId !== requesterId</code>).</li></ul>
+<ul><li>Referenced post and provider exist.</li></ul>
+<ul><li>Requester has <code>available_balance &gt;= duration</code> (pre-check only; credits are not deducted until acceptance).</li></ul>
+
+<h2>6.4 Trigger</h2>
+
+<pre><code>POST /exchanges/request
+Authorization: Bearer &lt;accessToken&gt;
+
+{
+  "postId": number,
+  "providerId": number,
+  "duration": number,
+  "maximumEndDate": ISO8601 date (must be in future)
+}</code></pre>
+
+<h2>6.5 Implementation Flow</h2>
+
+<ol start="1"><li>1. <strong>Authentication and validation</strong> — All exchange routes use <code>authMiddleware</code>; body validated by <code>createExchangeSchema</code>.</li></ol>
+<ol start="2"><li>2. <strong>Self-request guard</strong> — Rejected if requester equals provider.</li></ol>
+<ol start="3"><li>3. <strong>Entity validation</strong> — Post and provider looked up; requester's <code>available_balance</code> checked.</li></ol>
+<ol start="4"><li>4. <strong>Contract creation</strong> — <code>ServiceExchange</code> created with <code>status: PENDING</code>, <code>escrow_status: NONE</code>, linking <code>post_id</code>, <code>provider_id</code>, <code>consumer_id</code>, <code>time_credits</code>, and <code>maximum_end_date</code>.</li></ol>
+<ol start="5"><li>5. <strong>Recommender signal</strong> — <code>syncInteraction({ userId, postId, action: "apply" })</code> sent to FastAPI.</li></ol>
+<ol start="6"><li>6. <strong>Notification</strong> — Provider receives <code>EXCHANGE_REQUESTED</code> in-app notification.</li></ol>
+<ol start="7"><li>7. <strong>Response</strong> — Exchange object mapped via <code>toExchangeResponse</code> (camelCase API shape).</li></ol>
+
+<p>There is no separate <code>Application</code> table; the pending exchange *is* the application.</p>
+
+<h2>6.6 Business Rules</h2>
+
+<ul><li>Duration: positive integer, max 100,000.</li></ul>
+<ul><li><code>maximumEndDate</code> must be strictly in the future.</li></ul>
+<ul><li>No credit deduction at request time — only a balance pre-check.</li></ul>
+<ul><li>One request creates one <code>PENDING</code> exchange; duplicate handling is left to business logic upstream.</li></ul>
+<ul><li>Credits remain in requester's available balance until provider accepts.</li></ul>
+
+<h2>6.7 Database Operations</h2>
+
+<table class="data-table">
+<tr><th>Operation</th><th>Entity</th><th>Details</th></tr>
+<tr><td>-----------</td><td>--------</td><td>---------</td></tr>
+<tr><td><strong>Read</strong></td><td><code>Post</code></td><td>Existence check</td></tr>
+<tr><td><strong>Read</strong></td><td><code>User</code></td><td>Provider existence; requester balance</td></tr>
+<tr><td><strong>Create</strong></td><td><code>ServiceExchange</code></td><td>Pending contract record</td></tr>
+<tr><td><strong>Create</strong></td><td><code>Notification</code></td><td>Provider alert (async, non-blocking)</td></tr>
+</table>
+
+<h2>6.8 Security Considerations</h2>
+
+<ul><li>JWT authentication required.</li></ul>
+<ul><li>Requester ID from token, not body.</li></ul>
+<ul><li>Self-service requests blocked.</li></ul>
+<ul><li>Balance check prevents obviously unfulfillable requests (final atomic hold occurs at acceptance).</li></ul>
+
+<h2>6.9 Error Handling</h2>
+
+<table class="data-table">
+<tr><th>Condition</th><th>HTTP Status</th><th>Message</th></tr>
+<tr><td>-----------</td><td>-------------</td><td>---------</td></tr>
+<tr><td>Self-request</td><td>400</td><td><code>"You cannot request a service from yourself"</code></td></tr>
+<tr><td>Post not found</td><td>404</td><td><code>"Post not found"</code></td></tr>
+<tr><td>Insufficient credits</td><td>400</td><td><code>"Insufficient time credits"</code></td></tr>
+<tr><td>Validation failure</td><td>400</td><td>Zod field errors</td></tr>
+</table>
+
+<p>Uses <code>ExchangeError</code> with explicit status codes, caught by controller.</p>
+
+<h2>6.10 Code References</h2>
+
+<p><strong>Snippet 1 — Route</strong></p>
+
+<p>*File:* <code>src/modules/exchanges/exchanges.routes.ts</code></p>
+
+<pre><code class="language-typescript">router.post("/request", validate(createExchangeSchema), createExchangeController);</code></pre>
+
+<p><strong>Snippet 2 — Request validation schema</strong></p>
+
+<p>*File:* <code>src/modules/exchanges/exchanges.schema.ts</code></p>
+
+<pre><code class="language-typescript">export const createExchangeSchema = z.object({
+  postId: z.coerce.number().int().positive(),
+  providerId: z.coerce.number().int().positive(),
+  duration: z.coerce.number().int().positive().max(100000),
+  maximumEndDate: z.coerce.date().refine(val =&gt; val &gt; new Date(), {
+    message: "Maximum end date must be in the future"
+  }),
+});</code></pre>
+
+<p><strong>Snippet 3 — Core apply logic</strong></p>
+
+<p>*File:* <code>src/modules/exchanges/exchanges.service.ts</code></p>
+
+<pre><code class="language-typescript">export const requestExchange = async (requesterId: number, data: CreateExchangeInput) =&gt; {
+  if (data.providerId === requesterId) {
+    throw new ExchangeError("You cannot request a service from yourself", 400);
+  }
+  // ... validation ...
+  if (requester.available_balance &lt; data.duration) {
+    throw new ExchangeError("Insufficient time credits", 400);
+  }
+
+  const exchange = await prisma.serviceExchange.create({
+    data: {
+      post_id: data.postId,
+      provider_id: data.providerId,
+      consumer_id: requesterId,
+      time_credits: data.duration,
+      maximum_end_date: data.maximumEndDate,
+      status: "PENDING",
+      escrow_status: "NONE",
+    },
+  });
+
+  syncInteraction({ userId: requesterId, postId: data.postId, action: "apply" });
+  // ... notification ...
+};</code></pre>
+
+<p><strong>Snippet 4 — Prisma ServiceExchange model</strong></p>
+
+<p>*File:* <code>prisma/schema.prisma</code></p>
+
+<pre><code class="language-prisma">model ServiceExchange {
+  id               Int                   @id @default(autoincrement())
+  post_id          Int?
+  provider_id      Int
+  consumer_id      Int
+  time_credits     Int
+  completed_hours  Int                   @default(0)
+  status           ServiceExchangeStatus @default(PENDING)
+  escrow_status    EscrowStatus          @default(NONE)
+  maximum_end_date DateTime
+  work_sessions    WorkSession[]
+  @@map("service_exchanges")
+}</code></pre>
+
+<hr/>
+
+<h1>7. Contact Post Owner</h1>
+
+<h2>7.1 Purpose</h2>
+
+<p>Contact Post Owner enables direct messaging between a user and a post's author. The system creates or reuses a post-linked conversation, then delivers messages in real time via Socket.IO with persistent storage in PostgreSQL. This supports pre-contract negotiation and coordination.</p>
+
+<h2>7.2 Actors</h2>
+
+<table class="data-table">
+<tr><th>Actor</th><th>Role</th></tr>
+<tr><td>-------</td><td>------</td></tr>
+<tr><td><strong>Caller</strong></td><td>User initiating contact (typically an applicant)</td></tr>
+<tr><td><strong>Post Owner</strong></td><td>Recipient when caller is not the owner</td></tr>
+<tr><td><strong>Chat Module</strong></td><td><code>chat.service.ts</code>, <code>message.service.ts</code>, controllers</td></tr>
+<tr><td><strong>Socket.IO Server</strong></td><td><code>src/realtime/socket.ts</code>, emit helpers</td></tr>
+<tr><td><strong>Notifications Module</strong></td><td>Message notifications and optional email</td></tr>
+<tr><td><strong>PostgreSQL</strong></td><td><code>Conversation</code>, <code>ConversationParticipant</code>, <code>Message</code></td></tr>
+</table>
+
+<h2>7.3 Preconditions</h2>
+
+<ul><li>Caller is authenticated.</li></ul>
+<ul><li>Referenced post exists.</li></ul>
+<ul><li>If caller is the post owner, <code>recipientId</code> must be explicitly provided.</li></ul>
+<ul><li>Caller and recipient must be distinct users.</li></ul>
+
+<h2>7.4 Trigger</h2>
+
+<p><strong>Step 1 — Create or get conversation:</strong></p>
+
+<pre><code>POST /conversations
+{ "postId": 123 }           // recipient auto-resolved to post owner</code></pre>
+
+<p><strong>Step 2 — Send message:</strong></p>
+
+<pre><code>POST /conversations/:conversationId/messages
+{ "body": "...", "clientMessageId": "&lt;uuid&gt;" }</code></pre>
+
+<h2>7.5 Implementation Flow</h2>
+
+<p><strong>Conversation creation:</strong></p>
+
+<ol start="1"><li>1. Load post; determine recipient (auto = owner if caller ≠ owner).</li></ol>
+<ol start="2"><li>2. Validate recipient exists and is not soft-deleted.</li></ol>
+<ol start="3"><li>3. Search for existing conversation with same post and both participants.</li></ol>
+<ol start="4"><li>4. If found, return existing conversation (<code>isNew: false</code>).</li></ol>
+<ol start="5"><li>5. Otherwise, create <code>Conversation</code> with <code>postId</code> and two <code>ConversationParticipant</code> rows.</li></ol>
+
+<p><strong>Message sending:</strong></p>
+
+<ol start="1"><li>1. Verify caller is a conversation participant (<code>assertConversationParticipant</code>).</li></ol>
+<ol start="2"><li>2. Persist <code>Message</code> with optional <code>clientMessageId</code> for idempotency (unique constraint).</li></ol>
+<ol start="3"><li>3. Fire-and-forget side effects: emit <code>chat:message:sent</code> to sender, <code>chat:message:new</code> to conversation room, create notification, emit <code>chat:notification:new</code>.</li></ol>
+<ol start="4"><li>4. Rate limit: 30 messages per minute per user on the send endpoint.</li></ol>
+
+<p>Real-time delivery uses Socket.IO rooms keyed by <code>conversationId</code>. Clients join via <code>chat:join</code> event after connecting with JWT in <code>socket.handshake.auth.token</code>.</p>
+
+<h2>7.6 Business Rules</h2>
+
+<ul><li>Post owner contacting someone must specify <code>recipientId</code>.</li></ul>
+<ul><li>Non-owner contacting a post auto-targets the owner.</li></ul>
+<ul><li>Self-messaging is prohibited.</li></ul>
+<ul><li>One post-linked conversation per participant pair is reused (deduplication).</li></ul>
+<ul><li>Messages require non-empty body validated by <code>sendMessageSchema</code>.</li></ul>
+
+<h2>7.7 Database Operations</h2>
+
+<table class="data-table">
+<tr><th>Operation</th><th>Entity</th><th>Details</th></tr>
+<tr><td>-----------</td><td>--------</td><td>---------</td></tr>
+<tr><td><strong>Read</strong></td><td><code>Post</code></td><td>Resolve owner</td></tr>
+<tr><td><strong>Read</strong></td><td><code>User</code></td><td>Recipient validation</td></tr>
+<tr><td><strong>Read/Create</strong></td><td><code>Conversation</code></td><td>Dedup or create with participants</td></tr>
+<tr><td><strong>Create</strong></td><td><code>Message</code></td><td>Persist message body and metadata</td></tr>
+<tr><td><strong>Create</strong></td><td><code>Notification</code></td><td>Async message notification</td></tr>
+</table>
+
+<h2>7.8 Security Considerations</h2>
+
+<ul><li>JWT on REST endpoints; JWT on Socket.IO handshake.</li></ul>
+<ul><li>Participant guard prevents sending to conversations the user does not belong to.</li></ul>
+<ul><li>Message rate limiting mitigates spam.</li></ul>
+<ul><li><code>clientMessageId</code> unique constraint prevents duplicate message insertion on retry.</li></ul>
+
+<h2>7.9 Error Handling</h2>
+
+<table class="data-table">
+<tr><th>Condition</th><th>HTTP Status</th><th>Message</th></tr>
+<tr><td>-----------</td><td>-------------</td><td>---------</td></tr>
+<tr><td>Post not found</td><td>404</td><td><code>"Post not found"</code></td></tr>
+<tr><td>Missing recipientId (owner case)</td><td>400</td><td><code>"You must provide recipientId"</code></td></tr>
+<tr><td>Not a participant</td><td>403</td><td>Chat guard error</td></tr>
+<tr><td>Duplicate clientMessageId</td><td>200</td><td>Returns existing message (idempotent)</td></tr>
+</table>
+
+<h2>7.10 Code References</h2>
+
+<p><strong>Snippet 1 — Conversation creation with owner resolution</strong></p>
+
+<p>*File:* <code>src/modules/chat/chat.service.ts</code></p>
+
+<pre><code class="language-typescript">export const createOrGetConversation = async (callerId: number, input: CreateConversationInput) =&gt; {
+  const post = await prisma.post.findUnique({ where: { id: input.postId } });
+  if (!post) throw new ChatError("Post not found", 404);
+
+  let targetRecipientId: number;
+  if (callerId === post.user_id) {
+    if (!input.recipientId) throw new ChatError("You must provide recipientId", 400);
+    targetRecipientId = input.recipientId;
+  } else {
+    targetRecipientId = post.user_id;
+  }
+  // ... dedupe or create ...
+};</code></pre>
+
+<p><strong>Snippet 2 — Socket.IO message broadcast</strong></p>
+
+<p>*File:* <code>src/modules/chat/message.service.ts</code></p>
+
+<pre><code class="language-typescript">fireAndForget("chat:message-side-effects", async () =&gt; {
+  emitToUser(callerId, "chat:message:sent", response);
+  emitToConversation(conversationId, "chat:message:new", response);
+  const notification = await createMessageNotification({ ... });
+  emitToConversation(conversationId, "chat:notification:new", notification);
+});</code></pre>
+
+<p><strong>Snippet 3 — Chat routes</strong></p>
+
+<p>*File:* <code>src/modules/chat/chat.routes.ts</code></p>
+
+<pre><code class="language-typescript">router.post("/", validate(createConversationSchema), createConversationController);
+router.post("/:conversationId/messages", messageRateLimit(30, 60 * 1000),
+  validate(sendMessageSchema), sendMessageController);</code></pre>
+
+<p><strong>Snippet 4 — Conversation schema</strong></p>
+
+<p>*File:* <code>src/modules/chat/chat.schema.ts</code></p>
+
+<pre><code class="language-typescript">export const createConversationSchema = z.object({
+  postId: z.coerce.number().int().positive(),
+  recipientId: z.coerce.number().int().positive().optional(),
+});</code></pre>
+
+<hr/>
+
+<h1>8. Create Service Contract</h1>
+
+<h2>8.1 Purpose</h2>
+
+<p>In Wasla, a service contract is materialized as a <code>ServiceExchange</code> entity. Contract creation occurs in two phases: (1) <strong>Request Phase</strong> — the consumer applies via <code>POST /exchanges/request</code>, creating a <code>PENDING</code> contract; (2) <strong>Activation Phase</strong> — the provider accepts via <code>PUT /exchanges/:id/accept</code>, atomically holding time credits in escrow and transitioning the contract to <code>IN_PROGRESS</code>. This use case documents the full contract lifecycle from creation through activation.</p>
+
+<h2>8.2 Actors</h2>
+
+<table class="data-table">
+<tr><th>Actor</th><th>Role</th></tr>
+<tr><td>-------</td><td>------</td></tr>
+<tr><td><strong>Consumer (Requester)</strong></td><td>Initiates contract request</td></tr>
+<tr><td><strong>Provider</strong></td><td>Accepts or rejects the contract</td></tr>
+<tr><td><strong>Exchanges Module</strong></td><td>Request and acceptance services</td></tr>
+<tr><td><strong>Wallet/Escrow Logic</strong></td><td>Credit hold in <code>User.available_balance</code> → <code>User.escrow_balance</code></td></tr>
+<tr><td><strong>Notifications Module</strong></td><td>Contract state change alerts</td></tr>
+<tr><td><strong>PostgreSQL</strong></td><td><code>ServiceExchange</code>, <code>User</code>, <code>Transaction</code></td></tr>
+</table>
+
+<h2>8.3 Preconditions</h2>
+
+<ul><li><strong>Request phase:</strong> Same as Apply to Post (Section 6).</li></ul>
+<ul><li><strong>Activation phase:</strong> Contract exists in <code>PENDING</code> status; caller is the provider; requester still has sufficient available credits at acceptance time.</li></ul>
+
+<h2>8.4 Trigger</h2>
+
+<p><strong>Phase 1 — Request (contract creation):</strong></p>
+
+<pre><code>POST /exchanges/request</code></pre>
+
+<p><strong>Phase 2 — Activation (contract becomes binding):</strong></p>
+
+<pre><code>PUT /exchanges/:id/accept
+Authorization: Bearer &lt;providerToken&gt;</code></pre>
+
+<h2>8.5 Implementation Flow</h2>
+
+<p><strong>Phase 1 — PENDING contract</strong> (see Section 6): Creates exchange with <code>escrow_status: NONE</code>. No funds moved.</p>
+
+<p><strong>Phase 2 — Acceptance (<code>acceptExchange</code>):</strong></p>
+
+<ol start="1"><li>1. Serializable transaction begins (<code>runSerializable</code>).</li></ol>
+<ol start="2"><li>2. Load exchange; verify caller is provider and status is <code>PENDING</code>.</li></ol>
+<ol start="3"><li>3. <strong>Atomic escrow hold</strong> — <code>updateMany</code> on requester's user row with condition <code>available_balance &gt;= time_credits</code>, decrementing available and incrementing escrow atomically. If count is 0, requester no longer has funds.</li></ol>
+<ol start="4"><li>4. <strong>Status transition</strong> — Exchange updated to <code>status: IN_PROGRESS</code>, <code>escrow_status: HELD</code>, <code>accepted_at: now()</code>.</li></ol>
+<ol start="5"><li>5. Optimistic concurrency via <code>updateMany</code> with status condition prevents double-acceptance.</li></ol>
+<ol start="6"><li>6. Provider and consumer notified.</li></ol>
+
+<p>Design decision: Escrow hold at acceptance (not at request) protects requesters from premature credit lock-up and allows providers to reject without financial side effects.</p>
+
+<h2>8.6 Business Rules</h2>
+
+<ul><li>Only provider may accept.</li></ul>
+<ul><li>Acceptance requires <code>PENDING</code> status.</li></ul>
+<ul><li>Credit hold is race-safe via conditional <code>updateMany</code>.</li></ul>
+<ul><li>Contract fields: <code>time_credits</code> (agreed duration), <code>maximum_end_date</code> (deadline), <code>completed_hours</code> (tracks confirmed work, default 0).</li></ul>
+<ul><li>Rejection sets status to <code>REJECTED</code> without financial movement.</li></ul>
+
+<h2>8.7 Database Operations</h2>
+
+<table class="data-table">
+<tr><th>Phase</th><th>Operation</th><th>Entity</th></tr>
+<tr><td>-------</td><td>-----------</td><td>--------</td></tr>
+<tr><td>Request</td><td>Create</td><td><code>ServiceExchange</code> (PENDING)</td></tr>
+<tr><td>Accept</td><td>Update</td><td><code>User</code> (balance transfer to escrow)</td></tr>
+<tr><td>Accept</td><td>Update</td><td><code>ServiceExchange</code> (IN_PROGRESS, HELD)</td></tr>
+<tr><td>Accept</td><td>Create</td><td><code>Transaction</code> (escrow hold ledger entry)</td></tr>
+</table>
+
+<h2>8.8 Security Considerations</h2>
+
+<ul><li>Provider-only acceptance enforced by comparing <code>exchange.provider_id === providerId</code>.</li></ul>
+<ul><li>Serializable isolation level prevents concurrent acceptance race conditions.</li></ul>
+<ul><li>Double-spend prevented by conditional balance update.</li></ul>
+
+<h2>8.9 Error Handling</h2>
+
+<table class="data-table">
+<tr><th>Condition</th><th>HTTP Status</th><th>Message</th></tr>
+<tr><td>-----------</td><td>-------------</td><td>---------</td></tr>
+<tr><td>Not provider</td><td>403</td><td><code>"Only the provider can accept this exchange"</code></td></tr>
+<tr><td>Not pending</td><td>400</td><td><code>"Exchange is not pending"</code></td></tr>
+<tr><td>Insufficient credits at accept</td><td>400</td><td><code>"Requester no longer has enough time credits"</code></td></tr>
+<tr><td>Concurrent accept</td><td>409</td><td><code>"Exchange is no longer pending"</code></td></tr>
+</table>
+
+<h2>8.10 Code References</h2>
+
+<p><strong>Snippet 1 — Atomic escrow hold on acceptance</strong></p>
+
+<p>*File:* <code>src/modules/exchanges/exchanges.service.ts</code></p>
+
+<pre><code class="language-typescript">const held = await tx.user.updateMany({
+  where: {
+    id: exchange.consumer_id,
+    available_balance: { gte: exchange.time_credits },
+  },
+  data: {
+    available_balance: { decrement: exchange.time_credits },
+    escrow_balance: { increment: exchange.time_credits },
+  },
+});
+if (held.count === 0) {
+  throw new ExchangeError("Requester no longer has enough time credits", 400);
+}
+
+await tx.serviceExchange.updateMany({
+  where: { id, status: "PENDING" },
+  data: { status: "IN_PROGRESS", escrow_status: "HELD", accepted_at: new Date() },
+});</code></pre>
+
+<p><strong>Snippet 2 — Accept route</strong></p>
+
+<p>*File:* <code>src/modules/exchanges/exchanges.routes.ts</code></p>
+
+<pre><code class="language-typescript">router.put("/:id/accept", acceptExchangeController);</code></pre>
+
+<p><strong>Snippet 3 — Escrow status enum</strong></p>
+
+<p>*File:* <code>prisma/schema.prisma</code></p>
+
+<pre><code class="language-prisma">enum EscrowStatus {
+  NONE
+  HELD
+  RELEASED
+  REFUNDED
+}</code></pre>
+
+<p><strong>Snippet 4 — Contract status enum</strong></p>
+
+<p>*File:* <code>prisma/schema.prisma</code></p>
+
+<pre><code class="language-prisma">enum ServiceExchangeStatus {
+  PENDING
+  ACCEPTED
+  IN_PROGRESS
+  WAITING_CONFIRMATION
+  COMPLETED
+  CANCELED
+  REJECTED
+  DISPUTED
+}</code></pre>
+
+<hr/>
+
+<h1>9. Record Work Session</h1>
+
+<h2>9.1 Purpose</h2>
+
+<p>Record Work Session allows the service provider to log completed work hours against an active contract. Each session enters a <code>PENDING_CONFIRMATION</code> state awaiting consumer approval. Upon confirmation, hours accumulate toward <code>completed_hours</code> on the contract, and the contract auto-completes when confirmed hours equal agreed <code>time_credits</code>.</p>
+
+<h2>9.2 Actors</h2>
+
+<table class="data-table">
+<tr><th>Actor</th><th>Role</th></tr>
+<tr><td>-------</td><td>------</td></tr>
+<tr><td><strong>Provider</strong></td><td>Records session hours</td></tr>
+<tr><td><strong>Consumer (Requester)</strong></td><td>Confirms or rejects sessions</td></tr>
+<tr><td><strong>Exchanges Module</strong></td><td><code>recordWorkSession</code>, <code>confirmWorkSession</code></td></tr>
+<tr><td><strong>Notifications Module</strong></td><td><code>SESSION_RECORDED</code> alerts</td></tr>
+<tr><td><strong>PostgreSQL</strong></td><td><code>WorkSession</code>, <code>ServiceExchange</code></td></tr>
+</table>
+
+<h2>9.3 Preconditions</h2>
+
+<ul><li>Contract status is <code>IN_PROGRESS</code> or <code>WAITING_CONFIRMATION</code>.</li></ul>
+<ul><li>Caller is the provider.</li></ul>
+<ul><li>Total hours (completed + pending + new) does not exceed <code>time_credits</code>.</li></ul>
+
+<h2>9.4 Trigger</h2>
+
+<pre><code>POST /exchanges/:id/sessions
+Authorization: Bearer &lt;providerToken&gt;
+
+{ "hours": number, "notes": "optional string" }</code></pre>
+
+<h2>9.5 Implementation Flow</h2>
+
+<ol start="1"><li>1. <strong>Validation</strong> — <code>createSessionSchema</code> enforces positive integer hours (max 100,000).</li></ol>
+<ol start="2"><li>2. <strong>Serializable transaction</strong> — Load contract; verify provider identity and active status.</li></ol>
+<ol start="3"><li>3. <strong>Hours cap check</strong> — Sum <code>completed_hours</code> + pending session hours + new hours; reject if exceeds <code>time_credits</code>.</li></ol>
+<ol start="4"><li>4. <strong>Session numbering</strong> — Auto-increment <code>session_number</code> per contract (unique constraint on <code>[contract_id, session_number]</code>).</li></ol>
+<ol start="5"><li>5. <strong>Create</strong> — <code>WorkSession</code> with <code>status: PENDING_CONFIRMATION</code>.</li></ol>
+<ol start="6"><li>6. <strong>Notify</strong> — Consumer receives <code>SESSION_RECORDED</code> notification.</li></ol>
+<ol start="7"><li>7. <strong>Confirmation flow</strong> (separate endpoint) — Consumer calls <code>PUT /exchanges/:id/sessions/:sessionId/confirm</code>; hours added to <code>completed_hours</code>; if <code>completed_hours === time_credits</code>, contract auto-completes with escrow release.</li></ol>
+
+<h2>9.6 Business Rules</h2>
+
+<ul><li>Only provider may record sessions.</li></ul>
+<ul><li>Hours must be positive integers.</li></ul>
+<ul><li>Cumulative hours (confirmed + pending + new) ≤ agreed credits.</li></ul>
+<ul><li>Sessions require explicit consumer confirmation before counting toward payment.</li></ul>
+<ul><li>Provider cannot confirm their own sessions.</li></ul>
+
+<h2>9.7 Database Operations</h2>
+
+<table class="data-table">
+<tr><th>Operation</th><th>Entity</th><th>Details</th></tr>
+<tr><td>-----------</td><td>--------</td><td>---------</td></tr>
+<tr><td><strong>Read</strong></td><td><code>ServiceExchange</code></td><td>Status, credits, completed_hours</td></tr>
+<tr><td><strong>Read</strong></td><td><code>WorkSession</code></td><td>Pending hours sum; last session number</td></tr>
+<tr><td><strong>Create</strong></td><td><code>WorkSession</code></td><td>New pending session</td></tr>
+<tr><td><strong>Update</strong> (on confirm)</td><td><code>ServiceExchange</code></td><td>Increment completed_hours; possibly COMPLETED</td></tr>
+<tr><td><strong>Update</strong> (on confirm)</td><td><code>WorkSession</code></td><td>Status → CONFIRMED</td></tr>
+</table>
+
+<h2>9.8 Security Considerations</h2>
+
+<ul><li>Provider-only recording enforced in service layer.</li></ul>
+<ul><li>Serializable transactions prevent concurrent over-recording.</li></ul>
+<ul><li>Participant checks on all exchange endpoints.</li></ul>
+
+<h2>9.9 Error Handling</h2>
+
+<table class="data-table">
+<tr><th>Condition</th><th>HTTP Status</th><th>Message</th></tr>
+<tr><td>-----------</td><td>-------------</td><td>---------</td></tr>
+<tr><td>Not provider</td><td>403</td><td><code>"Only the provider can record a session"</code></td></tr>
+<tr><td>Inactive contract</td><td>400</td><td><code>"Contract is not active"</code></td></tr>
+<tr><td>Hours exceed cap</td><td>400</td><td><code>"Total recorded hours cannot exceed agreed time credits"</code></td></tr>
+</table>
+
+<h2>9.10 Code References</h2>
+
+<p><strong>Snippet 1 — Session recording with hours cap</strong></p>
+
+<p>*File:* <code>src/modules/exchanges/exchanges.service.ts</code></p>
+
+<pre><code class="language-typescript">export const recordWorkSession = async (contractId: number, providerId: number, data: CreateSessionInput) =&gt; {
+  const result = await runSerializable(async (tx) =&gt; {
+    const exchange = await tx.serviceExchange.findUnique({ where: { id: contractId }, ... });
+    if (exchange.provider_id !== providerId) {
+      throw new ExchangeError("Only the provider can record a session", 403);
+    }
+    const pendingHours = pendingSessions.reduce((acc, s) =&gt; acc + s.hours, 0);
+    if (exchange.completed_hours + pendingHours + data.hours &gt; exchange.time_credits) {
+      throw new ExchangeError("Total recorded hours cannot exceed agreed time credits", 400);
+    }
+    const session = await tx.workSession.create({
+      data: { contract_id: contractId, session_number: nextSessionNumber, hours: data.hours, status: "PENDING_CONFIRMATION" },
+    });
+    return session;
+  });
+};</code></pre>
+
+<p><strong>Snippet 2 — Session schema</strong></p>
+
+<p>*File:* <code>src/modules/exchanges/exchanges.schema.ts</code></p>
+
+<pre><code class="language-typescript">export const createSessionSchema = z.object({
+  hours: z.coerce.number().int().positive().max(100000),
+  notes: z.string().optional(),
+});</code></pre>
+
+<p><strong>Snippet 3 — WorkSession model</strong></p>
+
+<p>*File:* <code>prisma/schema.prisma</code></p>
+
+<pre><code class="language-prisma">model WorkSession {
+  id             Int               @id @default(autoincrement())
+  contract_id    Int
+  session_number Int
+  hours          Int
+  notes          String?
+  status         WorkSessionStatus @default(PENDING_CONFIRMATION)
+  @@unique([contract_id, session_number])
+  @@map("work_sessions")
+}</code></pre>
+
+<p><strong>Snippet 4 — Session route</strong></p>
+
+<p>*File:* <code>src/modules/exchanges/exchanges.routes.ts</code></p>
+
+<pre><code class="language-typescript">router.post("/:id/sessions", validate(createSessionSchema), recordSessionController);</code></pre>
+
+<hr/>
+
+<h1>10. Resolve Contract at Maximum End Date</h1>
+
+<h2>10.1 Purpose</h2>
+
+<p>This use case automatically terminates active service contracts that have reached their agreed <code>maximum_end_date</code> without manual intervention. The system pays the provider for confirmed work hours, refunds unused credits to the consumer, marks the contract as completed, and notifies both parties. Resolution is executed by a scheduled cron job, not by user request.</p>
+
+<h2>10.2 Actors</h2>
+
+<table class="data-table">
+<tr><th>Actor</th><th>Role</th></tr>
+<tr><td>-------</td><td>------</td></tr>
+<tr><td><strong>Cron Scheduler</strong></td><td><code>node-cron</code> job in <code>contract-resolution.cron.ts</code></td></tr>
+<tr><td><strong>Exchanges Module</strong></td><td><code>resolveExpiredContracts</code></td></tr>
+<tr><td><strong>Provider</strong></td><td>Receives earned credits</td></tr>
+<tr><td><strong>Consumer</strong></td><td>Receives refund of unspent credits</td></tr>
+<tr><td><strong>Notifications Module</strong></td><td><code>CONTRACT_AUTO_RESOLVED</code> to both parties</td></tr>
+<tr><td><strong>PostgreSQL</strong></td><td><code>ServiceExchange</code>, <code>User</code>, <code>Transaction</code></td></tr>
+</table>
+
+<h2>10.3 Preconditions</h2>
+
+<ul><li>Contract status is <code>IN_PROGRESS</code> or <code>WAITING_CONFIRMATION</code>.</li></ul>
+<ul><li><code>maximum_end_date &lt;= current timestamp</code>.</li></ul>
+<ul><li>Cron job is initialized at application startup (<code>startCronJobs()</code> in <code>server.ts</code>).</li></ul>
+
+<h2>10.4 Trigger</h2>
+
+<p>Automatic — cron schedule <code>0 * * * *</code> (every hour at minute 0):</p>
+
+<pre><code>resolveExpiredContracts()</code></pre>
+
+<p>No HTTP endpoint exposes this operation.</p>
+
+<h2>10.5 Implementation Flow</h2>
+
+<ol start="1"><li>1. <strong>Discovery</strong> — Query all contracts where status ∈ <code>{IN_PROGRESS, WAITING_CONFIRMATION}</code> and <code>maximum_end_date &lt;= now</code>.</li></ol>
+<ol start="2"><li>2. <strong>Per-contract processing</strong> — For each expired contract:</li></ol>
+<p>a. Begin serializable transaction.</p>
+<p>b. Re-fetch contract with lock; skip if state changed or deadline no longer passed (optimistic re-check).</p>
+<p>c. Calculate <code>providerCredits = completed_hours</code> and <code>refundCredits = time_credits - completed_hours</code>.</p>
+<p>d. Transfer providerCredits to provider's <code>available_balance</code>; create <code>TRANSFER</code> transaction.</p>
+<p>e. Refund refundCredits to consumer's <code>available_balance</code>; create <code>REFUND</code> transaction.</p>
+<p>f. Update contract: <code>status: COMPLETED</code>, <code>escrow_status: RELEASED</code>, <code>completed_at: now</code>.</p>
+<ol start="3"><li>3. <strong>Notifications</strong> — Both parties receive <code>CONTRACT_AUTO_RESOLVED</code>.</li></ol>
+<ol start="4"><li>4. <strong>Error isolation</strong> — Per-contract try/catch; one failure does not abort batch processing.</li></ol>
+
+<p>Related feature: providers may propose deadline extensions via <code>POST /exchanges/:id/deadline</code>, requiring consumer approval before <code>maximum_end_date</code> is updated.</p>
+
+<h2>10.6 Business Rules</h2>
+
+<ul><li>Provider receives only <strong>confirmed</strong> hours (<code>completed_hours</code>), not pending sessions.</li></ul>
+<ul><li>Unconfirmed/pending session hours are not paid out automatically.</li></ul>
+<ul><li>Remaining escrow (<code>time_credits - completed_hours</code>) is refunded to consumer.</li></ul>
+<ul><li>Contracts already completed, canceled, or rejected are excluded.</li></ul>
+<ul><li>Re-fetch inside transaction prevents resolving a contract that was just manually completed.</li></ul>
+
+<h2>10.7 Database Operations</h2>
+
+<table class="data-table">
+<tr><th>Operation</th><th>Entity</th><th>Details</th></tr>
+<tr><td>-----------</td><td>--------</td><td>---------</td></tr>
+<tr><td><strong>Read</strong></td><td><code>ServiceExchange</code></td><td>Find expired active contracts</td></tr>
+<tr><td><strong>Update</strong></td><td><code>User</code> (provider)</td><td>Increment available_balance</td></tr>
+<tr><td><strong>Update</strong></td><td><code>User</code> (consumer)</td><td>Increment available_balance (refund)</td></tr>
+<tr><td><strong>Create</strong></td><td><code>Transaction</code></td><td>TRANSFER and REFUND ledger entries</td></tr>
+<tr><td><strong>Update</strong></td><td><code>ServiceExchange</code></td><td>COMPLETED, RELEASED, completed_at</td></tr>
+</table>
+
+<h2>10.8 Security Considerations</h2>
+
+<ul><li>No user-facing endpoint — only internal cron invocation.</li></ul>
+<ul><li>Serializable transactions prevent double-resolution.</li></ul>
+<ul><li>Re-check inside transaction handles concurrent manual completion.</li></ul>
+<ul><li>Escrow release is atomic with status update.</li></ul>
+
+<h2>10.9 Error Handling</h2>
+
+<ul><li>Individual contract failures are logged via <code>console.error</code> and skipped.</li></ul>
+<ul><li>Cron wrapper catches top-level exceptions without crashing the server.</li></ul>
+<ul><li>Returns count of successfully resolved contracts for logging.</li></ul>
+
+<h2>10.10 Code References</h2>
+
+<p><strong>Snippet 1 — Cron scheduler</strong></p>
+
+<p>*File:* <code>src/common/cron/contract-resolution.cron.ts</code></p>
+
+<pre><code class="language-typescript">export const startCronJobs = () =&gt; {
+  cron.schedule("0 * * * *", async () =&gt; {
+    const resolvedCount = await resolveExpiredContracts();
+    console.log(`[Cron] Successfully resolved ${resolvedCount} expired contracts.`);
+  });
+};</code></pre>
+
+<p><strong>Snippet 2 — Expired contract discovery</strong></p>
+
+<p>*File:* <code>src/modules/exchanges/exchanges.service.ts</code></p>
+
+<pre><code class="language-typescript">const expiredContracts = await prisma.serviceExchange.findMany({
+  where: {
+    status: { in: ["IN_PROGRESS", "WAITING_CONFIRMATION"] },
+    maximum_end_date: { lte: now },
+  },
+});</code></pre>
+
+<p><strong>Snippet 3 — Payment and refund logic</strong></p>
+
+<p>*File:* <code>src/modules/exchanges/exchanges.service.ts</code></p>
+
+<pre><code class="language-typescript">const providerCredits = currentContract.completed_hours;
+const refundCredits = currentContract.time_credits - providerCredits;
+
+if (providerCredits &gt; 0) {
+  await tx.user.update({
+    where: { id: currentContract.provider_id },
+    data: { available_balance: { increment: providerCredits } },
+  });
+}
+if (refundCredits &gt; 0) {
+  await tx.user.update({
+    where: { id: currentContract.consumer_id },
+    data: { available_balance: { increment: refundCredits } },
+  });
+}
+await tx.serviceExchange.update({
+  where: { id: currentContract.id },
+  data: { status: "COMPLETED", escrow_status: "RELEASED", completed_at: now },
+});</code></pre>
+
+<p><strong>Snippet 4 — Cron initialization at startup</strong></p>
+
+<p>*File:* <code>src/server.ts</code></p>
+
+<pre><code class="language-typescript">const app = express();
+startCronJobs();</code></pre>
+
+<hr/>
+
+<h1>11. View Recommended Posts</h1>
+
+<h2>11.1 Purpose</h2>
+
+<p>View Recommended Posts delivers a personalized post feed ranked by the FastAPI AI recommender using Sentence Transformers embeddings and FAISS similarity search. The backend acts as a <strong>feed proxy</strong>: it requests ordered post IDs from the AI service, hydrates full post objects from PostgreSQL preserving rank order, and falls back to chronological feed when the recommender is unavailable.</p>
+
+<h2>11.2 Actors</h2>
+
+<table class="data-table">
+<tr><th>Actor</th><th>Role</th></tr>
+<tr><td>-------</td><td>------</td></tr>
+<tr><td><strong>Authenticated User</strong></td><td>Consumes personalized feed on frontend</td></tr>
+<tr><td><strong>Recommender Module</strong></td><td><code>feedController</code>, <code>recommender.client.ts</code></td></tr>
+<tr><td><strong>AI Service (FastAPI)</strong></td><td><code>POST /recommend</code> — returns ranked post IDs</td></tr>
+<tr><td><strong>Posts Module</strong></td><td><code>hydratePublishedPostsById</code>, shared pagination utilities</td></tr>
+<tr><td><strong>PostgreSQL</strong></td><td>Published posts hydration</td></tr>
+</table>
+
+<h2>11.3 Preconditions</h2>
+
+<ul><li>Valid JWT access token.</li></ul>
+<ul><li>Recommender optionally configured via <code>RECOMMENDER_URL</code> and <code>RECOMMENDER_API_KEY</code> environment variables.</li></ul>
+<ul><li>User should exist in recommender index (synced at registration and on interactions).</li></ul>
+
+<h2>11.4 Trigger</h2>
+
+<pre><code>GET /feed/:userId?cursor=&lt;postId&gt;&amp;limit=20
+Authorization: Bearer &lt;accessToken&gt;</code></pre>
+
+<h2>11.5 Implementation Flow</h2>
+
+<ol start="1"><li>1. <strong>Authentication</strong> — <code>authMiddleware</code> on <code>feedRouter</code>.</li></ol>
+<ol start="2"><li>2. <strong>Parameter validation</strong> — <code>userId</code> parsed as positive integer; query params via <code>listPostsQuerySchema</code>.</li></ol>
+<ol start="3"><li>3. <strong>AI recommendation request</strong> — <code>fetchRecommendedPostIds(userId, 200)</code> calls <code>POST {RECOMMENDER_URL}/recommend</code> with <code>{ user_id, top_k: 200 }</code> and <code>X-Internal-Token</code> header. Timeout defaults to 5000 ms.</li></ol>
+<ol start="4"><li>4. <strong>Cursor-based paging over AI order</strong> — Unlike chronological feed, cursor is a <strong>post ID</strong> in the recommender's ordered list. System finds cursor index, slices next <code>limit + 1</code> IDs.</li></ol>
+<ol start="5"><li>5. <strong>Hydration</strong> — <code>hydratePublishedPostsById</code> loads posts from DB where <code>status: PUBLISHED</code>, preserving AI order (filters out unpublished/deleted).</li></ol>
+<ol start="6"><li>6. <strong>Fallback</strong> — If recommender disabled, times out, errors, or returns empty: <code>chronologicalFeed</code> executes same query as home feed. Response includes <code>source: "recommender" | "fallback"</code>.</li></ol>
+<ol start="7"><li>7. <strong>Response</strong> — <code>{ posts, nextCursor, source }</code>.</li></ol>
+
+<p>Integration architecture: <strong>Backend-as-proxy</strong> decouples the frontend from the Python AI service; the Express layer owns authentication, hydration, and graceful degradation.</p>
+
+<h2>11.6 Business Rules</h2>
+
+<ul><li>Only published posts appear in hydrated results.</li></ul>
+<ul><li>AI ordering preserved via ordered ID hydration (Map-based reorder).</li></ul>
+<ul><li>Maximum fetch cap: 200 IDs per recommender call (<code>RECOMMENDER_PAGE_FETCH_CAP</code>).</li></ul>
+<ul><li>Fallback is identical to <code>GET /posts</code> chronological logic.</li></ul>
+<ul><li>Interaction signals (apply, save) continuously update recommender via <code>syncInteraction</code>.</li></ul>
+
+<h2>11.7 Database Operations</h2>
+
+<table class="data-table">
+<tr><th>Operation</th><th>Entity</th><th>Details</th></tr>
+<tr><td>-----------</td><td>--------</td><td>---------</td></tr>
+<tr><td><strong>Read</strong></td><td><code>Post</code></td><td>Hydration by ID list, filtered to PUBLISHED</td></tr>
+<tr><td><strong>Read</strong></td><td><code>User</code></td><td>Nested author in postSelect</td></tr>
+</table>
+
+<p>No writes during feed retrieval. Recommender index updates happen asynchronously on user actions elsewhere.</p>
+
+<h2>11.8 Security Considerations</h2>
+
+<ul><li>JWT required for feed endpoint.</li></ul>
+<ul><li>AI service protected by shared internal token (<code>X-Internal-Token</code>), not exposed to frontend.</li></ul>
+<ul><li><strong>Note:</strong> Path param <code>:userId</code> is not validated against JWT subject — any authenticated user can request recommendations for any user ID (potential authorization gap).</li></ul>
+<ul><li>Recommender timeout prevents hung requests from blocking the feed.</li></ul>
+
+<h2>11.9 Error Handling</h2>
+
+<table class="data-table">
+<tr><th>Condition</th><th>HTTP Status</th><th>Behavior</th></tr>
+<tr><td>-----------</td><td>-------------</td><td>----------</td></tr>
+<tr><td>Invalid userId</td><td>400</td><td><code>"Invalid user id"</code></td></tr>
+<tr><td>Invalid query</td><td>400</td><td><code>"Invalid request data"</code></td></tr>
+<tr><td>Recommender unavailable</td><td>200</td><td>Fallback feed, <code>source: "fallback"</code></td></tr>
+<tr><td>Empty AI results</td><td>200</td><td>Fallback feed</td></tr>
+<tr><td>Unexpected error</td><td>500</td><td><code>"Feed failed"</code></td></tr>
+</table>
+
+<h2>11.10 Code References</h2>
+
+<p><strong>Snippet 1 — Feed controller with fallback</strong></p>
+
+<p>*File:* <code>src/modules/recommender/recommender.controller.ts</code></p>
+
+<pre><code class="language-typescript">export const feedController = async (req: Request, res: Response) =&gt; {
+  const page = await recommendedFeed(userId, limit, query.cursor);
+  if (!page) {
+    return res.json(feedResponse(await chronologicalFeed(limit, query.cursor), "fallback"));
+  }
+  return res.json(feedResponse(page, "recommender"));
+};</code></pre>
+
+<p><strong>Snippet 2 — AI recommender client</strong></p>
+
+<p>*File:* <code>src/modules/recommender/recommender.client.ts</code></p>
+
+<pre><code class="language-typescript">export const fetchRecommendedPostIds = async (userId: number | string, topK = 20) =&gt; {
+  const data = await request&lt;RecommendResponse&gt;("POST", "/recommend", {
+    user_id: String(userId),
+    top_k: topK,
+  });
+  return data.recommendations
+    .map((item) =&gt; Number(item.post_id))
+    .filter((id) =&gt; Number.isInteger(id));
+};</code></pre>
+
+<p><strong>Snippet 3 — Order-preserving hydration</strong></p>
+
+<p>*File:* <code>src/modules/posts/posts.hydration.ts</code></p>
+
+<pre><code class="language-typescript">export const hydratePublishedPostsById = async (order: number[]) =&gt; {
+  const posts = await prisma.post.findMany({
+    where: { id: { in: order }, status: "PUBLISHED" },
+    select: postSelect,
+  });
+  const byId = new Map(posts.map((post) =&gt; [post.id, post]));
+  return order.map((id) =&gt; byId.get(id)).filter(Boolean).map(toPostResponse);
+};</code></pre>
+
+<p><strong>Snippet 4 — Feed route registration</strong></p>
+
+<p>*File:* <code>src/modules/recommender/recommender.routes.ts</code></p>
+
+<pre><code class="language-typescript">export const feedRouter = Router();
+feedRouter.get("/:userId", authMiddleware, feedController);</code></pre>
+
+<hr/>
+
+<h2>Appendix A — System Architecture Summary</h2>
+
+<pre><code>┌─────────────┐     REST + JWT      ┌──────────────────┐
+│  Next.js    │ ◄──────────────────► │  Express Backend │
+│  Frontend   │     Socket.IO       │  (wasla-backend) │
+└─────────────┘ ◄──────────────────► └────────┬─────────┘
+                                               │
+                    ┌──────────────────────────┼──────────────────────────┐
+                    ▼                          ▼                          ▼
+            ┌──────────────┐          ┌──────────────┐          ┌──────────────┐
+            │  PostgreSQL  │          │ FastAPI AI   │          │  node-cron   │
+            │  (Prisma)    │          │ Recommender  │          │  (Contracts) │
+            └──────────────┘          └──────────────┘          └──────────────┘</code></pre>
+
+<p><strong>Key architectural patterns employed:</strong></p>
+
+<ul><li><strong>Modular monolith</strong> — Feature modules (<code>auth</code>, <code>posts</code>, <code>exchanges</code>, <code>chat</code>, <code>recommender</code>) with routes → controllers → services → Prisma.</li></ul>
+<ul><li><strong>Middleware pipeline</strong> — Authentication, validation (Zod), rate limiting applied declaratively on routes.</li></ul>
+<ul><li><strong>Escrow-based time credits</strong> — Financial logic embedded in exchange service with serializable transactions.</li></ul>
+<ul><li><strong>AI proxy with graceful degradation</strong> — Backend mediates recommender calls with chronological fallback.</li></ul>
+<ul><li><strong>Eventual consistency for AI index</strong> — Fire-and-forget sync on registration, post creation, and interactions.</li></ul>
+<ul><li><strong>Real-time messaging</strong> — Socket.IO for chat; polling-based notifications for contract events.</li></ul>
+
+<hr/>
+
+<p>*Document generated from analysis of the Wasla backend source code repository. All endpoints, schemas, and business rules reflect the implementation as of the current codebase state.*</p>
+  </section>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</body>
+</html>

@@ -46,6 +46,8 @@ type ExchangeRecord = {
   time_credits: number;
   status: string;
   escrow_status: string;
+  maximum_end_date: Date;
+  proposed_end_date: Date | null;
   accepted_at: Date | null;
   delivered_at: Date | null;
   completed_at: Date | null;
@@ -68,6 +70,8 @@ const toExchangeResponse = (exchange: ExchangeRecord) => ({
   requesterId: exchange.consumer_id,
   providerId: exchange.provider_id,
   duration: exchange.time_credits,
+  contractEndDate: exchange.maximum_end_date,
+  proposedEndDate: exchange.proposed_end_date,
   status: exchange.status,
   escrowStatus: exchange.escrow_status,
   acceptedAt: exchange.accepted_at,
@@ -171,7 +175,7 @@ export const requestExchange = async (
       provider_id: data.providerId,
       consumer_id: requesterId,
       time_credits: data.duration,
-      maximum_end_date: data.maximumEndDate,
+      maximum_end_date: data.contractEndDate,
       status: "PENDING",
       escrow_status: "NONE",
     },

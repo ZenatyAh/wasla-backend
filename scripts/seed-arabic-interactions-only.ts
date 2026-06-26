@@ -96,6 +96,7 @@ const main = async () => {
             postId: target.id,
             providerId: target.ownerId,
             duration: 1,
+            contractEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           }),
         });
         if (r.ok) applies++;

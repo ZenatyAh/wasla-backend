@@ -189,10 +189,12 @@ if (!hasTestDatabase) {
       const postId = await createServicePost(provider.id);
       const duration = 3;
 
+      const contractEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
       const created = await request(app)
         .post("/exchanges/request")
         .set(authHeader(requester.token))
-        .send({ postId, providerId: provider.id, duration });
+        .send({ postId, providerId: provider.id, duration, contractEndDate });
       assert.equal(created.status, 201);
       const exchangeId = created.body.exchange.id;
 
@@ -234,10 +236,11 @@ if (!hasTestDatabase) {
       await createWelcomeBonus(requester.id);
 
       const postId = await createServicePost(provider.id);
+      const contractEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       const created = await request(app)
         .post("/exchanges/request")
         .set(authHeader(requester.token))
-        .send({ postId, providerId: provider.id, duration: 2 });
+        .send({ postId, providerId: provider.id, duration: 2, contractEndDate });
       const exchangeId = created.body.exchange.id;
 
       await request(app)

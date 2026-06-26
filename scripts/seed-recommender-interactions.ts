@@ -245,6 +245,7 @@ const runApiMode = async (exportData: ExportPayload) => {
                 postId: item.postId,
                 providerId: item.providerId,
                 duration: 1,
+                contractEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
               }),
             }),
           );

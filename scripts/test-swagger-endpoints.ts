@@ -136,7 +136,12 @@ function minimalBody(method: HttpMethod, path: string): Record<string, unknown> 
     return { name: `Swagger Skill ${runId}`, category: "GENERAL" };
   }
   if (path.includes("/exchanges/request")) {
-    return { postId: 0, providerId: 0, duration: 1 };
+    return {
+      postId: 0,
+      providerId: 0,
+      duration: 1,
+      contractEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    };
   }
   if (path.includes("/exchanges/{id}/dispute")) {
     return { reason: "Swagger smoke test dispute" };
@@ -271,7 +276,12 @@ async function main() {
   const exchangeResponse = await request(app)
     .post("/exchanges/request")
     .set(authHeader(token))
-    .send({ postId: post.id, providerId: otherUser.id, duration: 1 });
+    .send({
+      postId: post.id,
+      providerId: otherUser.id,
+      duration: 1,
+      contractEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    });
   if (exchangeResponse.status >= 200 && exchangeResponse.status < 300) {
     exchangeId = exchangeResponse.body.exchange?.id ?? exchangeResponse.body.id ?? 0;
   }

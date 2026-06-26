@@ -85,10 +85,11 @@ if (!hasTestDatabase) {
     postId: number,
     duration: number,
   ) => {
+    const contractEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const response = await request(app)
       .post("/exchanges/request")
       .set(authHeader(requester.token))
-      .send({ postId, providerId, duration });
+      .send({ postId, providerId, duration, contractEndDate });
     return response;
   };
 
@@ -144,6 +145,7 @@ if (!hasTestDatabase) {
         assert.equal(response.body.exchange.escrowStatus, "NONE");
         assert.equal(response.body.exchange.requesterId, requester.id);
         assert.equal(response.body.exchange.providerId, provider.id);
+        assert.ok(response.body.exchange.contractEndDate);
         exchangeId = response.body.exchange.id;
 
         // Critical: requesting must NOT touch the requester's balance.

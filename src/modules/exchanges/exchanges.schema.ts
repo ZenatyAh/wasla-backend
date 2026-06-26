@@ -11,12 +11,32 @@ export const exchangeStatusSchema = z.enum([
   "DISPUTED",
 ]);
 
-export const createExchangeSchema = z.object({
-  postId: z.coerce.number().int().positive(),
-  providerId: z.coerce.number().int().positive(),
-  duration: z.coerce.number().int().positive().max(100000),
-  maximumEndDate: z.coerce.date().refine(val => val > new Date(), { message: "Maximum end date must be in the future" }),
-});
+const futureContractEndDate = z.coerce
+  .date()
+  .refine((val) => val > new Date(), {
+    message: "Contract end date must be in the future",
+  });
+
+export const createExchangeSchema = z.preprocess(
+  (data) => {
+    if (
+      data &&
+      typeof data === "object" &&
+      "maximumEndDate" in data &&
+      !("contractEndDate" in data)
+    ) {
+      const { maximumEndDate, ...rest } = data as Record<string, unknown>;
+      return { ...rest, contractEndDate: maximumEndDate };
+    }
+    return data;
+  },
+  z.object({
+    postId: z.coerce.number().int().positive(),
+    providerId: z.coerce.number().int().positive(),
+    duration: z.coerce.number().int().positive().max(100000),
+    contractEndDate: futureContractEndDate,
+  }),
+);
 
 export const listExchangesQuerySchema = z.object({
   role: z.enum(["provider", "requester"]).optional(),
