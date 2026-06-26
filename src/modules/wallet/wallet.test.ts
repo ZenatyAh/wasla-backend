@@ -247,15 +247,15 @@ if (!hasTestDatabase) {
         .put(`/exchanges/${exchangeId}/accept`)
         .set(authHeader(provider.token));
 
-      const pendingResponse = await request(app)
-        .get("/api/v1/wallet/history?status=pending&type=debit")
+      const heldResponse = await request(app)
+        .get("/api/v1/wallet/history?status=held&type=debit")
         .set(authHeader(requester.token));
 
-      assert.equal(pendingResponse.status, 200);
+      assert.equal(heldResponse.status, 200);
       assert.ok(
-        pendingResponse.body.data.some(
+        heldResponse.body.data.some(
           (item: { status: string; type: string }) =>
-            item.status === "pending" && item.type === "debit",
+            item.status === "held" && item.type === "debit",
         ),
       );
 

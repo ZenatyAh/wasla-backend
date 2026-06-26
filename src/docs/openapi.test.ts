@@ -2,6 +2,77 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { openApiSpec } from "./openapi.js";
 
+type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
+
+const HTTP_METHODS: HttpMethod[] = ["get", "post", "put", "patch", "delete"];
+
+/** HTTP operations implemented in server.ts and module routers (OpenAPI path syntax). */
+const EXPECTED_API_OPERATIONS: Array<{ method: HttpMethod; path: string }> = [
+  { method: "get", path: "/" },
+  { method: "get", path: "/health" },
+  { method: "get", path: "/docs" },
+  { method: "get", path: "/docs/openapi.json" },
+  { method: "get", path: "/docs/chat-frontend" },
+  { method: "get", path: "/me" },
+  { method: "post", path: "/auth/register" },
+  { method: "post", path: "/auth/login" },
+  { method: "post", path: "/auth/forget-password" },
+  { method: "post", path: "/auth/reset-password" },
+  { method: "post", path: "/auth/change-password" },
+  { method: "post", path: "/auth/refresh" },
+  { method: "post", path: "/auth/logout" },
+  { method: "get", path: "/posts" },
+  { method: "post", path: "/posts" },
+  { method: "get", path: "/posts/me" },
+  { method: "get", path: "/posts/saved" },
+  { method: "post", path: "/posts/search" },
+  { method: "get", path: "/posts/{postId}" },
+  { method: "patch", path: "/posts/{postId}" },
+  { method: "delete", path: "/posts/{postId}" },
+  { method: "post", path: "/posts/{postId}/save" },
+  { method: "delete", path: "/posts/{postId}/save" },
+  { method: "post", path: "/conversations" },
+  { method: "post", path: "/conversations/direct" },
+  { method: "get", path: "/conversations" },
+  { method: "get", path: "/conversations/{conversationId}" },
+  { method: "get", path: "/conversations/{conversationId}/messages" },
+  { method: "post", path: "/conversations/{conversationId}/messages" },
+  { method: "patch", path: "/messages/{messageId}" },
+  { method: "delete", path: "/messages/{messageId}" },
+  { method: "post", path: "/messages/{messageId}/read" },
+  { method: "get", path: "/notifications" },
+  { method: "patch", path: "/notifications/read-all" },
+  { method: "patch", path: "/notifications/all/read" },
+  { method: "patch", path: "/notifications/{id}/read" },
+  { method: "post", path: "/users/search" },
+  { method: "delete", path: "/users/account" },
+  { method: "put", path: "/users/profile" },
+  { method: "get", path: "/users/{id}/profile" },
+  { method: "get", path: "/users/{id}/reviews" },
+  { method: "post", path: "/reviews" },
+  { method: "get", path: "/skills" },
+  { method: "post", path: "/skills" },
+  { method: "post", path: "/exchanges/request" },
+  { method: "get", path: "/exchanges" },
+  { method: "get", path: "/exchanges/{id}" },
+  { method: "put", path: "/exchanges/{id}/accept" },
+  { method: "put", path: "/exchanges/{id}/reject" },
+  { method: "put", path: "/exchanges/{id}/deliver" },
+  { method: "put", path: "/exchanges/{id}/confirm" },
+  { method: "put", path: "/exchanges/{id}/cancel" },
+  { method: "post", path: "/exchanges/{id}/dispute" },
+  { method: "get", path: "/exchanges/{id}/sessions" },
+  { method: "post", path: "/exchanges/{id}/sessions" },
+  { method: "put", path: "/exchanges/{id}/sessions/{sessionId}/confirm" },
+  { method: "put", path: "/exchanges/{id}/sessions/{sessionId}/reject" },
+  { method: "post", path: "/exchanges/{id}/deadline" },
+  { method: "put", path: "/exchanges/{id}/deadline/approve" },
+  { method: "put", path: "/exchanges/{id}/deadline/reject" },
+  { method: "get", path: "/api/v1/wallet/history" },
+  { method: "get", path: "/feed/{userId}" },
+  { method: "get", path: "/internal/recommender-export" },
+];
+
 const collectRefs = (value: unknown, refs = new Set<string>()): Set<string> => {
   if (Array.isArray(value)) {
     for (const item of value) {
@@ -41,6 +112,27 @@ const resolveRef = (ref: string): boolean => {
   return current !== undefined;
 };
 
+const collectOpenApiOperations = (): Array<{ method: HttpMethod; path: string }> => {
+  const ops: Array<{ method: HttpMethod; path: string }> = [];
+
+  for (const [path, item] of Object.entries(openApiSpec.paths)) {
+    for (const method of HTTP_METHODS) {
+      if ((item as Record<string, unknown>)[method]) {
+        ops.push({ method, path });
+      }
+    }
+  }
+
+  return ops;
+};
+
+const sortOperations = (
+  ops: Array<{ method: HttpMethod; path: string }>,
+) =>
+  [...ops].sort(
+    (a, b) => a.path.localeCompare(b.path) || a.method.localeCompare(b.method),
+  );
+
 describe("OpenAPI spec", () => {
   it("resolves all internal $ref targets", () => {
     const refs = collectRefs(openApiSpec);
@@ -50,6 +142,14 @@ describe("OpenAPI spec", () => {
       missing,
       [],
       `Unresolved OpenAPI refs: ${missing.join(", ")}`,
+    );
+  });
+
+  it("documents every HTTP route exposed by the server", () => {
+    const documented = collectOpenApiOperations();
+    assert.deepEqual(
+      sortOperations(documented),
+      sortOperations(EXPECTED_API_OPERATIONS),
     );
   });
 
@@ -68,6 +168,29 @@ describe("OpenAPI spec", () => {
     assert.ok("/skills" in openApiSpec.paths);
     assert.ok("get" in openApiSpec.paths["/skills"]);
     assert.ok("post" in openApiSpec.paths["/skills"]);
+  });
+
+  it("documents wallet status values aligned with implementation", () => {
+    const walletStatus =
+      openApiSpec.components.schemas.WalletTransaction.properties.status.enum;
+    assert.deepEqual(walletStatus, [
+      "completed",
+      "refunded",
+      "held",
+      "disputed",
+      "cancelled",
+    ]);
+
+    const queryStatus = openApiSpec.paths["/api/v1/wallet/history"].get
+      .parameters.find((param: { name?: string }) => param.name === "status")
+      .schema.enum;
+    assert.deepEqual(queryStatus, [
+      "completed",
+      "refunded",
+      "held",
+      "disputed",
+      "cancelled",
+    ]);
   });
 
   it("documents chat idempotency and socket payload schemas", () => {

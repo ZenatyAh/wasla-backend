@@ -157,6 +157,27 @@ export const openApiSpec = {
         },
       },
     },
+    "/docs/chat-frontend": {
+      get: {
+        tags: ["System"],
+        summary: "Chat frontend integration guide (HTML)",
+        description:
+          "Serves the HTML chat integration guide for frontend developers (Socket.IO events, message lifecycle, idempotency).",
+        responses: {
+          "200": {
+            description: "Chat frontend guide HTML",
+            content: {
+              "text/html": {
+                schema: {
+                  type: "string",
+                },
+                example: "<!doctype html><html>...</html>",
+              },
+            },
+          },
+        },
+      },
+    },
     "/me": {
       get: {
         tags: ["User"],
@@ -2102,7 +2123,7 @@ export const openApiSpec = {
         tags: ["Wallet"],
         summary: "List wallet transaction history",
         description:
-          "Returns the authenticated user's time-credit transaction history with offset pagination. Includes ledger entries (welcome bonus, transfers, refunds) and virtual pending/cancelled exchange rows derived from escrow state.",
+          "Returns the authenticated user's time-credit transaction history with offset pagination. Includes ledger entries (welcome bonus, transfers, refunds) and virtual escrow/cancelled exchange rows derived from contract state.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -2134,8 +2155,10 @@ export const openApiSpec = {
             required: false,
             schema: {
               type: "string",
-              enum: ["completed", "pending", "cancelled"],
+              enum: ["completed", "refunded", "held", "disputed", "cancelled"],
             },
+            description:
+              "Filter by row status. Escrow rows use `held` or `disputed`; ledger refunds use `refunded`.",
           },
           {
             name: "startDate",
@@ -2177,7 +2200,7 @@ export const openApiSpec = {
         tags: ["Feed"],
         summary: "Get personalized post feed",
         description:
-          "Returns published posts ordered by the recommender when available. Falls back to chronological posts when the recommender is disabled or unavailable.",
+          "Returns published posts ordered by the recommender when available. Falls back to chronological posts when the recommender is disabled or unavailable. Requires authentication but does not enforce that the path `userId` matches the JWT subject — any authenticated client may request any user's feed path.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -2301,7 +2324,7 @@ export const openApiSpec = {
             minLength: 8,
             maxLength: 50,
             description:
-              "Must include at least one uppercase letter, lowercase letter, digit, and special character.",
+              "Must include at least one uppercase letter, lowercase letter, digit, and special character. Must be different from currentPassword.",
             example: "NewPass@456",
           },
         },
@@ -2321,6 +2344,8 @@ export const openApiSpec = {
             type: "string",
             minLength: 3,
             maxLength: 100,
+            description:
+              "Letters only (Latin or Arabic); no digits.",
             example: "Ahmed Zenaty",
           },
           username: {
@@ -2700,6 +2725,8 @@ export const openApiSpec = {
       },
       CreatePostRequest: {
         type: "object",
+        description:
+          "When serviceMode is OFFLINE, city and area are required.",
         required: ["title", "description", "category", "serviceMode", "assignedTimeCredits"],
         properties: {
           title: {
@@ -2733,11 +2760,13 @@ export const openApiSpec = {
           city: {
             type: "string",
             minLength: 2,
+            description: "Required when serviceMode is OFFLINE.",
             example: "Cairo",
           },
           area: {
             type: "string",
             minLength: 2,
+            description: "Required when serviceMode is OFFLINE.",
             example: "Maadi",
           },
           status: {
@@ -2749,6 +2778,9 @@ export const openApiSpec = {
       },
       UpdatePostRequest: {
         type: "object",
+        description:
+          "At least one field is required. When serviceMode is OFFLINE, city and area are required.",
+        minProperties: 1,
         properties: {
           title: {
             type: "string",
@@ -3194,25 +3226,34 @@ export const openApiSpec = {
       },
       UpdateProfileRequest: {
         type: "object",
+        description: "At least one field is required.",
+        minProperties: 1,
         properties: {
-          name: { type: "string", minLength: 3, maxLength: 100 },
+          name: {
+            type: "string",
+            minLength: 3,
+            maxLength: 100,
+            description: "Letters only (Latin or Arabic); no digits.",
+          },
           bio: { type: "string", maxLength: 500, nullable: true },
           profilePicture: { type: "string", format: "uri", nullable: true },
           offeredSkills: {
             type: "array",
             minItems: 1,
             maxItems: 10,
+            uniqueItems: true,
             items: { type: "string", minLength: 2 },
             description:
-              "Full list of skills the user offers; replaces existing offered skills when provided",
+              "Full list of skills the user offers; replaces existing offered skills when provided. Duplicate skill names are rejected.",
           },
           requiredSkills: {
             type: "array",
             minItems: 1,
             maxItems: 10,
+            uniqueItems: true,
             items: { type: "string", minLength: 2 },
             description:
-              "Full list of skills the user needs; replaces existing required skills when provided",
+              "Full list of skills the user needs; replaces existing required skills when provided. Duplicate skill names are rejected.",
           },
         },
       },
@@ -3380,6 +3421,8 @@ export const openApiSpec = {
       },
       ExchangeStatus: {
         type: "string",
+        description:
+          "PUT /exchanges/{id}/accept sets IN_PROGRESS (not ACCEPTED). ACCEPTED is a legacy DB enum value and is not returned by the accept endpoint.",
         enum: [
           "PENDING",
           "ACCEPTED",
@@ -3518,7 +3561,9 @@ export const openApiSpec = {
           },
           status: {
             type: "string",
-            enum: ["completed", "pending", "cancelled"],
+            enum: ["completed", "refunded", "held", "disputed", "cancelled"],
+            description:
+              "Ledger rows use completed or refunded. Active escrow rows use held or disputed. Cancelled contracts use cancelled.",
           },
           timestamp: { type: "string", format: "date-time" },
         },
