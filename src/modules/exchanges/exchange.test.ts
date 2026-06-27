@@ -170,6 +170,9 @@ if (!hasTestDatabase) {
         const balances = await getBalances(requester.id);
         assert.equal(balances.available_balance, 2);
         assert.equal(balances.escrow_balance, 3);
+
+        const post = await prisma.post.findUniqueOrThrow({ where: { id: postId } });
+        assert.equal(post.status, "ARCHIVED");
       });
 
       it("moves to WAITING_CONFIRMATION on delivery, balances unchanged", async () => {
@@ -207,6 +210,9 @@ if (!hasTestDatabase) {
         // Stats incremented on both sides.
         assert.equal(requesterBalances.services_received, 1);
         assert.equal(providerBalances.services_provided, 1);
+
+        const post = await prisma.post.findUniqueOrThrow({ where: { id: postId } });
+        assert.equal(post.status, "ARCHIVED");
       });
 
       it("records a TRANSFER ledger entry for the completed exchange", async () => {
@@ -818,6 +824,84 @@ if (!hasTestDatabase) {
         assert.equal(await resolveExpiredContracts(), 0);
         const afterSecond = await getBalances(requester.id);
         assert.deepEqual(afterSecond, afterFirst);
+      });
+    });
+
+    // ---------------------------------------------------------------------
+    // Post archiving on contract accept
+    // ---------------------------------------------------------------------
+    describe("Post archiving on accept", () => {
+      it("rejects requests when the post is not PUBLISHED", async () => {
+        const requester = await createActor("arch_req_blocked", 5);
+        const provider = await createActor("arch_prov_blocked", 5);
+        const postId = await createServicePost(provider.id);
+
+        await prisma.post.update({
+          where: { id: postId },
+          data: { status: "ARCHIVED" },
+        });
+
+        const response = await createPendingExchange(
+          requester,
+          provider.id,
+          postId,
+          3,
+        );
+        assert.equal(response.status, 400);
+        assert.match(response.body.message, /no longer available/i);
+      });
+
+      it("rejects requests when provider does not own the post", async () => {
+        const requester = await createActor("arch_req_owner", 5);
+        const provider = await createActor("arch_prov_owner", 5);
+        const otherProvider = await createActor("arch_other_prov", 5);
+        const postId = await createServicePost(provider.id);
+
+        const response = await createPendingExchange(
+          requester,
+          otherProvider.id,
+          postId,
+          3,
+        );
+        assert.equal(response.status, 400);
+        assert.match(response.body.message, /does not own/i);
+      });
+
+      it("accepting one pending contract rejects other pending contracts on the same post", async () => {
+        const requesterA = await createActor("arch_req_a", 5);
+        const requesterB = await createActor("arch_req_b", 5);
+        const provider = await createActor("arch_prov_compete", 5);
+        const postId = await createServicePost(provider.id);
+
+        const first = await createPendingExchange(
+          requesterA,
+          provider.id,
+          postId,
+          3,
+        );
+        const second = await createPendingExchange(
+          requesterB,
+          provider.id,
+          postId,
+          3,
+        );
+
+        const acceptResponse = await request(app)
+          .put(`/exchanges/${first.body.exchange.id}/accept`)
+          .set(authHeader(provider.token));
+        assert.equal(acceptResponse.status, 200);
+
+        const winner = await prisma.serviceExchange.findUniqueOrThrow({
+          where: { id: first.body.exchange.id },
+        });
+        const loser = await prisma.serviceExchange.findUniqueOrThrow({
+          where: { id: second.body.exchange.id },
+        });
+        const post = await prisma.post.findUniqueOrThrow({ where: { id: postId } });
+
+        assert.equal(winner.status, "IN_PROGRESS");
+        assert.equal(loser.status, "REJECTED");
+        assert.equal(post.status, "ARCHIVED");
       });
     });
 

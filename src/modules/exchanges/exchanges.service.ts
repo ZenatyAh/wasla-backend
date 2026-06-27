@@ -1,5 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
-import { syncInteraction } from "../recommender/recommender.client.js";
+import { syncBootstrapRebuild, syncInteraction } from "../recommender/recommender.client.js";
 import {
   derivePostCategory,
   type PostForMapping,
@@ -207,6 +207,11 @@ const fetchExchange = (id: number) =>
     .findUniqueOrThrow({ where: { id }, select: exchangeSelect })
     .then((exchange) => toExchangeResponse(exchange as ExchangeRecord));
 
+type AcceptExchangeSideEffects = {
+  archivedPost: boolean;
+  rejectedExchanges: Array<{ id: number; consumer_id: number }>;
+};
+
 export const requestExchange = async (
   requesterId: number,
   data: CreateExchangeInput,
@@ -217,10 +222,16 @@ export const requestExchange = async (
 
   const post = await prisma.post.findUnique({
     where: { id: data.postId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, user_id: true },
   });
   if (!post) {
     throw new ExchangeError("Post not found", 404);
+  }
+  if (post.status !== "PUBLISHED") {
+    throw new ExchangeError("This post is no longer available for requests", 400);
+  }
+  if (post.user_id !== data.providerId) {
+    throw new ExchangeError("Provider does not own this post", 400);
   }
 
   const provider = await prisma.user.findUnique({
@@ -274,11 +285,12 @@ export const requestExchange = async (
 };
 
 export const acceptExchange = async (id: number, providerId: number) => {
-  await runSerializable(async (tx) => {
+  const sideEffects = await runSerializable<AcceptExchangeSideEffects>(async (tx) => {
     const exchange = await tx.serviceExchange.findUnique({
       where: { id },
       select: {
         id: true,
+        post_id: true,
         provider_id: true,
         consumer_id: true,
         time_credits: true,
@@ -325,6 +337,38 @@ export const acceptExchange = async (id: number, providerId: number) => {
     if (updated.count === 0) {
       throw new ExchangeError("Exchange is no longer pending", 409);
     }
+
+    let archivedPost = false;
+    let rejectedExchanges: Array<{ id: number; consumer_id: number }> = [];
+
+    if (exchange.post_id) {
+      const archived = await tx.post.updateMany({
+        where: { id: exchange.post_id, status: "PUBLISHED" },
+        data: { status: "ARCHIVED" },
+      });
+      archivedPost = archived.count > 0;
+
+      rejectedExchanges = await tx.serviceExchange.findMany({
+        where: {
+          post_id: exchange.post_id,
+          id: { not: exchange.id },
+          status: "PENDING",
+        },
+        select: { id: true, consumer_id: true },
+      });
+
+      if (rejectedExchanges.length > 0) {
+        await tx.serviceExchange.updateMany({
+          where: {
+            id: { in: rejectedExchanges.map((row) => row.id) },
+            status: "PENDING",
+          },
+          data: { status: "REJECTED" },
+        });
+      }
+    }
+
+    return { archivedPost, rejectedExchanges };
   });
 
   const result = await fetchExchange(id);
@@ -337,6 +381,22 @@ export const acceptExchange = async (id: number, providerId: number) => {
     contractId: result.id,
     ...contractNotificationMetaFromResponse(result),
   });
+
+  for (const rejected of sideEffects.rejectedExchanges) {
+    const rejectedResult = await fetchExchange(rejected.id);
+    await notifyContract({
+      recipientId: rejected.consumer_id,
+      type: "EXCHANGE_REJECTED",
+      title: "تم رفض طلبك",
+      body: "تم رفض طلب الخدمة الخاص بك.",
+      contractId: rejectedResult.id,
+      ...contractNotificationMetaFromResponse(rejectedResult),
+    });
+  }
+
+  if (sideEffects.archivedPost) {
+    syncBootstrapRebuild();
+  }
 
   return result;
 };

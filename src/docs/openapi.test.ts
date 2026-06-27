@@ -273,7 +273,8 @@ describe("OpenAPI spec", () => {
     assert.match(exchangesTag.description, /propose an extension/);
     assert.match(exchangesTag.description, /UC-TX-07/);
     assert.match(exchangesTag.description, /CONTRACT_AUTO_COMPLETED/);
-    assert.match(exchangesTag.description, /CONTRACT_AUTO_DISPUTED/);
+    assert.match(exchangesTag.description, /ARCHIVED/);
+    assert.match(exchangesTag.description, /auto-rejected/);
 
     const reviewsTag = openApiSpec.tags.find(
       (tag: { name?: string }) => tag.name === "Reviews",
@@ -316,5 +317,15 @@ describe("OpenAPI spec", () => {
     assert.ok(notificationData.properties.fault);
     assert.ok(notificationData.properties.providerCredits);
     assert.ok(notificationData.properties.refundCredits);
+  });
+
+  it("documents post archiving on contract accept", () => {
+    const acceptPut = openApiSpec.paths["/exchanges/{id}/accept"].put;
+    const requestPost = openApiSpec.paths["/exchanges/request"].post;
+
+    assert.match(acceptPut.description, /ARCHIVED/);
+    assert.match(acceptPut.description, /REJECTED/);
+    assert.match(requestPost.description, /PUBLISHED/);
+    assert.match(requestPost.description, /owned by `providerId`/);
   });
 });

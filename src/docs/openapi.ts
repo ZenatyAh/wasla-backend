@@ -123,6 +123,7 @@ export const openApiSpec = {
         "Time-credit service exchange (contract) lifecycle with escrow: request, accept, reject, deliver, confirm, cancel, dispute, work sessions, and deadline extensions. " +
         contractDeadlineWorkflow +
         " Work sessions increment confirmed hours on requester approval; when confirmed hours reach `duration`, the contract auto-completes without waiting for the deadline. " +
+        "When the provider accepts, the linked post (if any) is set to `ARCHIVED`, removed from public feed/search, and other PENDING requests for the same post are auto-rejected. The post is not auto-republished when the contract ends. " +
         "Most state transitions push an in-app notification via Socket.IO `notification:new` and `contract:notification:new` on room `user:{userId}` (see Notifications tag). " +
         "No notification is sent for deliver, whole-contract confirm, or manual dispute.",
     },
@@ -1737,6 +1738,7 @@ export const openApiSpec = {
         summary: "Request a service exchange (create contract)",
         description:
           "Creates a PENDING contract. No time credits are deducted at this stage. The requester is the authenticated user; you cannot request a service from yourself, and you must currently hold at least `duration` available credits. " +
+          "The post must be `PUBLISHED` and owned by `providerId`. " +
           "`contractEndDate` (legacy alias `maximumEndDate`) is stored as the agreed deadline and included in the notification payload. " +
           contractNotificationDelivery("EXCHANGE_REQUESTED", "provider"),
         security: [{ bearerAuth: [] }],
@@ -1862,6 +1864,7 @@ export const openApiSpec = {
         summary: "Accept a contract (provider only)",
         description:
           "Provider-only. The contract must be PENDING. Runs in a serializable transaction: re-checks the requester's available credits, then deducts `duration` from available and moves it into escrow (HELD). Fails if the requester no longer has enough credits. " +
+          "If the contract has a linked post, that post is set to `ARCHIVED` and other PENDING contracts on the same post are set to `REJECTED` (those requesters receive `EXCHANGE_REJECTED`). The post stays archived after the contract completes until the owner manually re-publishes it. " +
           contractNotificationDelivery("EXCHANGE_ACCEPTED", "requester"),
         security: [{ bearerAuth: [] }],
         parameters: [
