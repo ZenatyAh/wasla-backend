@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/prisma.js";
 import { type NotificationType } from "../../generated/prisma/client.js";
 import { sendMessageEmail } from "../../common/utils/sendMessageEmail.js";
+import { emitToUser } from "../../realtime/emit.js";
 import { ChatError } from "../chat/chat.errors.js";
 import type { ListNotificationsQuery } from "./notification.schema.js";
 
@@ -23,6 +24,19 @@ const toNotificationResponse = (notification: {
   isRead: notification.isRead,
   createdAt: notification.createdAt,
 });
+
+type NotificationResponse = ReturnType<typeof toNotificationResponse>;
+
+const publishNotificationToUser = (
+  userId: number,
+  notification: NotificationResponse,
+) => {
+  emitToUser(userId, "notification:new", notification);
+
+  if (notification.type === "NEW_MESSAGE") {
+    emitToUser(userId, "chat:notification:new", notification);
+  }
+};
 
 export const createMessageNotification = async (input: {
   recipientId: number;
@@ -58,7 +72,9 @@ export const createMessageNotification = async (input: {
     // Email failures must not block in-app notifications.
   }
 
-  return toNotificationResponse(notification);
+  const response = toNotificationResponse(notification);
+  publishNotificationToUser(input.recipientId, response);
+  return response;
 };
 
 export const createContractNotification = async (input: {
@@ -78,7 +94,9 @@ export const createContractNotification = async (input: {
     },
   });
 
-  return toNotificationResponse(notification);
+  const response = toNotificationResponse(notification);
+  publishNotificationToUser(input.recipientId, response);
+  return response;
 };
 
 export const listNotifications = async (

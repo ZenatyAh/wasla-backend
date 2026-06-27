@@ -1,5 +1,9 @@
 import { prisma } from "../../lib/prisma.js";
 import { syncInteraction } from "../recommender/recommender.client.js";
+import {
+  derivePostCategory,
+  type PostForMapping,
+} from "../recommender/recommender.mapper.js";
 import { createContractNotification } from "../notifications/notification.service.js";
 import { ExchangeError } from "./exchanges.errors.js";
 import type { CreateExchangeInput, ListExchangesQuery, CreateSessionInput, DeadlineExtensionInput } from "./exchanges.schema.js";
@@ -27,7 +31,23 @@ const exchangeSelect = {
     select: { id: true, username: true, full_name: true, profile_image: true },
   },
   post: {
-    select: { id: true, title: true, category: true, service_mode: true },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      category: true,
+      service_mode: true,
+      user: {
+        select: {
+          skills: {
+            select: {
+              skill_type: true,
+              skill: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
   },
 } as const;
 
@@ -56,13 +76,15 @@ type ExchangeRecord = {
   updated_at: Date;
   provider: ExchangeParticipant;
   consumer: ExchangeParticipant;
-  post: {
-    id: number;
-    title: string;
-    category: string;
-    service_mode: string;
-  } | null;
+  post: PostForMapping | null;
 };
+
+const toExchangePostResponse = (post: PostForMapping) => ({
+  id: post.id,
+  title: post.title,
+  category: derivePostCategory(post),
+  service_mode: post.service_mode,
+});
 
 const toExchangeResponse = (exchange: ExchangeRecord) => ({
   id: exchange.id,
@@ -82,7 +104,7 @@ const toExchangeResponse = (exchange: ExchangeRecord) => ({
   updatedAt: exchange.updated_at,
   requester: exchange.consumer,
   provider: exchange.provider,
-  post: exchange.post,
+  post: exchange.post ? toExchangePostResponse(exchange.post) : null,
 });
 
 /**

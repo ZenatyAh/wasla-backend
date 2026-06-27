@@ -57,7 +57,7 @@ const processMessageSideEffects = (params: {
       select: { postId: true },
     });
 
-    const notification = await createMessageNotification({
+    await createMessageNotification({
       recipientId: recipient.userId,
       recipientEmail: recipient.user.email,
       recipientName: recipient.user.full_name,
@@ -67,8 +67,6 @@ const processMessageSideEffects = (params: {
       postId: conversation?.postId ?? undefined,
       preview,
     });
-
-    emitToConversation(conversationId, "chat:notification:new", notification);
   });
 };
 

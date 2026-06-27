@@ -541,7 +541,8 @@ const socket = io(BACKEND_URL, {
               <tr><td><code>chat:message:edited</code></td><td>Message</td><td>—</td></tr>
               <tr><td><code>chat:message:deleted</code></td><td><code>{ id, conversationId, deletedAt }</code></td><td>—</td></tr>
               <tr><td><code>chat:message:read</code></td><td>ReadReceipt</td><td>—</td></tr>
-              <tr><td><code>chat:notification:new</code></td><td>Notification</td><td>—</td></tr>
+              <tr><td><code>notification:new</code></td><td>Notification</td><td>All notification types; room <code>user:{userId}</code></td></tr>
+              <tr><td><code>chat:notification:new</code></td><td>Notification</td><td>Deprecated alias for <code>NEW_MESSAGE</code> only</td></tr>
               <tr><td><code>chat:error</code></td><td><code>{ code, message }</code></td><td>—</td></tr>
             </tbody>
           </table>

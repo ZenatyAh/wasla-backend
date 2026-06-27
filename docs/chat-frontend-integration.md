@@ -249,7 +249,8 @@ interface ChatMessagesReadPayload {
 | `chat:messages:status` | `ChatMessagesStatusEvent` | **جديد** — تحديثات status مجمّعة |
 | `chat:presence:online` | `{ userId: number }` | **جديد** |
 | `chat:presence:offline` | `{ userId: number, lastSeen: string }` | **جديد** |
-| `chat:notification:new` | `Notification` | إشعار جديد |
+| `notification:new` | `Notification` | إشعار جديد (كل الأنواع — غرفة `user:{userId}`) |
+| `chat:notification:new` | `Notification` | alias قديم لـ `NEW_MESSAGE` فقط (سيتم إزالته لاحقاً) |
 | `chat:error` | `{ code, message }` | خطأ |
 
 ```typescript
@@ -296,6 +297,40 @@ socket.on("chat:presence:offline", ({ userId, lastSeen }) => {
 ```
 
 > الأحداث تُرسل **لشركاء المحادثة فقط** — ليس broadcast عام.
+
+---
+
+## 5b. Notifications (Hybrid)
+
+### Real-time (Socket.IO)
+
+عند الاتصال بالـ socket، المستخدم ينضم تلقائياً لغرفة `user:{userId}`. استمع لـ:
+
+```typescript
+socket.on("notification:new", (notification: Notification) => {
+  prependToInbox(notification);
+  showToast(notification.title, notification.body);
+});
+```
+
+- **كل أنواع الإشعارات** (رسائل، عقود، جلسات، مواعيد) تصل عبر `notification:new`.
+- `chat:notification:new` alias مؤقت لرسائل الدردشة فقط — يُفضّل الاعتماد على `notification:new`.
+
+### REST (تاريخ + قراءة)
+
+| Endpoint | الاستخدام |
+|----------|-----------|
+| `GET /notifications` | تحميل أولي، pagination، بعد reconnect |
+| `PATCH /notifications/:id/read` | تعليم إشعار كمقروء |
+| `PATCH /notifications/read-all` | تعليم الكل كمقروء |
+
+**لا تستخدم polling دوري.** استخدم socket للجديد و REST للتاريخ والـ mark-read.
+
+```typescript
+socket.on("connect", () => {
+  fetchNotifications({ limit: 20 }); // reconcile after reconnect
+});
+```
 
 ### Fallback من REST
 

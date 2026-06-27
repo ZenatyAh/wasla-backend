@@ -43,12 +43,15 @@ export const openApiSpec = {
         "**Client → server events:** `chat:join`, `chat:leave`, `chat:messages:delivered`, `chat:messages:read` " +
         "(see `ChatMessagesDeliveredPayload`, `ChatMessagesReadPayload`).\n\n" +
         "**Server → client events:** `chat:message:new`, `chat:message:sent`, `chat:message:edited`, `chat:message:deleted`, " +
-        "`chat:message:read`, `chat:messages:status`, `chat:presence:online`, `chat:presence:offline`, `chat:notification:new`, `chat:error` " +
+        "`chat:message:read`, `chat:messages:status`, `chat:presence:online`, `chat:presence:offline`, " +
+        "`notification:new`, `chat:notification:new` (deprecated alias for `NEW_MESSAGE`), `chat:error` " +
         "(see corresponding `Chat*Event` schemas).",
     },
     {
       name: "Notifications",
-      description: "In-app notifications for chat and platform events",
+      description:
+        "In-app notifications for chat and platform events. New notifications are pushed in real time via Socket.IO " +
+        "(`notification:new` on personal room `user:{userId}`). Use REST for inbox history, pagination, and mark-as-read.",
     },
     {
       name: "Profile",
@@ -1228,6 +1231,9 @@ export const openApiSpec = {
       get: {
         tags: ["Notifications"],
         summary: "List notifications",
+        description:
+          "Paginated inbox history. For real-time delivery, listen for Socket.IO `notification:new` on room `user:{userId}` " +
+          "(auto-joined on connect). Call this endpoint on app load, pull-to-refresh, and after reconnect to reconcile missed events.",
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "cursor", in: "query", schema: { type: "string" } },
@@ -3497,7 +3503,12 @@ export const openApiSpec = {
             properties: {
               id: { type: "integer" },
               title: { type: "string" },
-              category: { type: "string", enum: ["OFFER", "REQUEST"] },
+              category: {
+                type: "string",
+                description:
+                  "Skill name derived from the post author's offered or needed skills",
+                example: "برمجة",
+              },
               service_mode: { type: "string", enum: ["ONLINE", "OFFLINE"] },
             },
           },
