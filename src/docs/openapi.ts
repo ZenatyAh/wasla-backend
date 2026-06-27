@@ -3,14 +3,16 @@ const contractNotificationDelivery = (
   recipient: string,
 ) =>
   `Pushes \`${type}\` to the ${recipient} via Socket.IO \`notification:new\` and \`contract:notification:new\` on room \`user:{userId}\`. ` +
-  "Notification `data` includes `contractId`, `contractEndDate`, `proposedEndDate`, `status`, and for auto-resolution outcomes optionally `fault`, `providerCredits`, and `refundCredits`.";
+  "Notification `data` includes `contractId`, `contractEndDate`, `proposedEndDate`, `status`, and for auto-resolution outcomes optionally `fault`, `providerCredits`, and `refundCredits`. " +
+  "`DEADLINE_APPROACHING` also includes `canProposeExtension` (provider) and `canApproveExtension` (requester).";
 
 const contractDeadlineWorkflow =
   "**Contract deadline (`maximum_end_date`):** the requester sets it at creation as `contractEndDate` (legacy alias `maximumEndDate`). " +
   "It is returned as `contractEndDate`; a pending extension is `proposedEndDate`. " +
   "Only the provider may propose an extension; only the requester may approve or reject it. " +
   "On approval, `contractEndDate` is updated and any prior deadline reminder is reset. " +
-  "Hourly cron sends `DEADLINE_APPROACHING` to both parties when less than 24 hours remain (once per deadline). " +
+  "Every 15 minutes, cron sends `DEADLINE_APPROACHING` to both parties when less than 24 hours remain (once per deadline). " +
+  "The provider notification explains they may propose an extension; the requester notification explains they may approve or reject a proposed extension. " +
   "Every 15 minutes, cron auto-resolves active contracts (`IN_PROGRESS` or `WAITING_CONFIRMATION`) past `contractEndDate` (UC-TX-07). " +
   "**Alt 1 — full completion:** when confirmed session hours equal `duration`, status becomes `COMPLETED`, escrow `RELEASED`, provider receives full credits → `CONTRACT_AUTO_COMPLETED`. " +
   "**Alt 2 — seeker fault:** when hours are short and the last session is `PENDING_CONFIRMATION`, status becomes `DISPUTED`, escrow `RELEASED`, provider receives confirmed hours only, remainder refunded → `CONTRACT_AUTO_DISPUTED` (`fault: SEEKER`). " +
@@ -79,7 +81,7 @@ export const openApiSpec = {
         "**REST inbox:** `GET /notifications` for history/pagination; `PATCH /notifications/:id/read` and `PATCH /notifications/read-all` for read state. " +
         "Call REST on app load and after reconnect to reconcile missed socket events.\n\n" +
         contractDeadlineWorkflow +
-        "\n\n**Contract notification types** (payload `data`: `{ contractId, contractEndDate, proposedEndDate, status, fault?, providerCredits?, refundCredits? }`):\n\n" +
+        "\n\n**Contract notification types** (payload `data`: `{ contractId, contractEndDate, proposedEndDate, status, fault?, providerCredits?, refundCredits?, canProposeExtension?, canApproveExtension? }`):\n\n" +
         "| Operation | Type | Recipient |\n" +
         "|-----------|------|----------|\n" +
         "| `POST /exchanges/request` | `EXCHANGE_REQUESTED` | Provider |\n" +
@@ -92,7 +94,7 @@ export const openApiSpec = {
         "| `POST /exchanges/{id}/deadline` | `DEADLINE_PROPOSED` | Requester |\n" +
         "| `PUT /exchanges/{id}/deadline/approve` | `DEADLINE_APPROVED` | Provider |\n" +
         "| `PUT /exchanges/{id}/deadline/reject` | `DEADLINE_REJECTED` | Provider |\n" +
-        "| Cron approaching deadline (hourly) | `DEADLINE_APPROACHING` | Both parties |\n" +
+        "| Cron approaching deadline (every 15 min) | `DEADLINE_APPROACHING` | Both parties (provider: may propose extension; requester: may approve/reject) |\n" +
         "| Cron auto-resolve (every 15 min) — full completion | `CONTRACT_AUTO_COMPLETED` | Both parties |\n" +
         "| Cron auto-resolve — partial (seeker/provider fault) | `CONTRACT_AUTO_DISPUTED` | Both parties |\n" +
         "| Cron auto-resolve — failure | `CONTRACT_RESOLUTION_FAILED` | Both parties |\n\n" +
@@ -1322,6 +1324,8 @@ export const openApiSpec = {
                         fault: null,
                         providerCredits: null,
                         refundCredits: null,
+                        canProposeExtension: true,
+                        canApproveExtension: false,
                       },
                       isRead: false,
                       createdAt: "2026-06-27T12:00:00.000Z",
@@ -3438,6 +3442,20 @@ export const openApiSpec = {
             nullable: true,
             description: "Credits refunded to the requester on auto-resolution",
             example: 3,
+          },
+          canProposeExtension: {
+            type: "boolean",
+            nullable: true,
+            description:
+              "True on DEADLINE_APPROACHING for the provider — they may propose a new contractEndDate",
+            example: true,
+          },
+          canApproveExtension: {
+            type: "boolean",
+            nullable: true,
+            description:
+              "True on DEADLINE_APPROACHING for the requester — they may approve or reject a proposed extension",
+            example: false,
           },
         },
         example: {

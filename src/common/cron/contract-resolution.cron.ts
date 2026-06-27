@@ -19,7 +19,7 @@ export const startCronJobs = () => {
   });
 
   // Remind both parties when a contract deadline is within 24 hours
-  cron.schedule("0 * * * *", async () => {
+  cron.schedule("*/15 * * * *", async () => {
     console.log("[Cron] Running approaching deadline reminders...");
     try {
       const notifiedCount = await notifyApproachingDeadlines();

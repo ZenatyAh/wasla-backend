@@ -265,9 +265,12 @@ describe("OpenAPI spec", () => {
     const exchangesTag = openApiSpec.tags.find(
       (tag: { name?: string }) => tag.name === "Exchanges",
     );
+    assert.match(notificationsTag.description, /canProposeExtension/);
+
     assert.match(exchangesTag.description, /contract:notification:new/);
     assert.match(exchangesTag.description, /DEADLINE_APPROACHING/);
     assert.match(exchangesTag.description, /Every 15 minutes/);
+    assert.match(exchangesTag.description, /propose an extension/);
     assert.match(exchangesTag.description, /UC-TX-07/);
     assert.match(exchangesTag.description, /CONTRACT_AUTO_COMPLETED/);
     assert.match(exchangesTag.description, /CONTRACT_AUTO_DISPUTED/);

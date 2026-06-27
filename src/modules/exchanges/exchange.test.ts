@@ -21,6 +21,7 @@ if (!hasTestDatabase) {
   const { prisma } = await import("../../lib/prisma.js");
   const { default: app } = await import("../../server.js");
   const { resolveExpiredContracts } = await import("./exchanges.service.js");
+  const { notifyApproachingDeadlines } = await import("./exchanges.service.js");
 
   const runId = `exch_${Date.now()}`;
   const password = "TestPass@123";
@@ -817,6 +818,70 @@ if (!hasTestDatabase) {
         assert.equal(await resolveExpiredContracts(), 0);
         const afterSecond = await getBalances(requester.id);
         assert.deepEqual(afterSecond, afterFirst);
+      });
+    });
+
+    // ---------------------------------------------------------------------
+    // 8. Approaching deadline reminder (24h extension notice)
+    // ---------------------------------------------------------------------
+    describe("Approaching deadline reminder", () => {
+      it("notifies provider and consumer with extension guidance once per deadline", async () => {
+        const requester = await createActor("deadline_req", 10);
+        const provider = await createActor("deadline_prov", 5);
+        const postId = await createServicePost(provider.id);
+        const created = await createPendingExchange(requester, provider.id, postId, 3);
+        const exchangeId = created.body.exchange.id;
+
+        await request(app)
+          .put(`/exchanges/${exchangeId}/accept`)
+          .set(authHeader(provider.token));
+
+        const in12Hours = new Date(Date.now() + 12 * 60 * 60 * 1000);
+        await prisma.serviceExchange.update({
+          where: { id: exchangeId },
+          data: { maximum_end_date: in12Hours, deadline_reminder_sent_at: null },
+        });
+
+        assert.equal(await notifyApproachingDeadlines(), 1);
+
+        const providerNotification = await prisma.notification.findFirst({
+          where: {
+            userId: provider.id,
+            type: "DEADLINE_APPROACHING",
+          },
+          orderBy: { createdAt: "desc" },
+        });
+        const consumerNotification = await prisma.notification.findFirst({
+          where: {
+            userId: requester.id,
+            type: "DEADLINE_APPROACHING",
+          },
+          orderBy: { createdAt: "desc" },
+        });
+
+        assert.ok(providerNotification);
+        assert.ok(consumerNotification);
+        assert.match(providerNotification.body, /اقتراح تمديد/);
+
+        const providerData = providerNotification.data as {
+          canProposeExtension?: boolean;
+          canApproveExtension?: boolean;
+        };
+        const consumerData = consumerNotification.data as {
+          canProposeExtension?: boolean;
+          canApproveExtension?: boolean;
+        };
+        assert.equal(providerData.canProposeExtension, true);
+        assert.equal(providerData.canApproveExtension, false);
+        assert.equal(consumerData.canProposeExtension, false);
+        assert.equal(consumerData.canApproveExtension, true);
+
+        const exchange = await prisma.serviceExchange.findUniqueOrThrow({
+          where: { id: exchangeId },
+        });
+        assert.ok(exchange.deadline_reminder_sent_at);
+
+        assert.equal(await notifyApproachingDeadlines(), 0);
       });
     });
   });

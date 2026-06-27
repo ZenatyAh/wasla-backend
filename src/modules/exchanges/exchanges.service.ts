@@ -10,6 +10,7 @@ import {
   deadlineResolutionNotificationCopy,
   type ResolutionPlan,
 } from "./contract-resolution.js";
+import { approachingDeadlineNotificationCopy } from "./deadline-reminders.js";
 import type { ServiceExchange } from "../../generated/prisma/client.js";
 import { ExchangeError } from "./exchanges.errors.js";
 import type { CreateExchangeInput, ListExchangesQuery, CreateSessionInput, DeadlineExtensionInput } from "./exchanges.schema.js";
@@ -1041,19 +1042,21 @@ export const notifyApproachingDeadlines = async () => {
       await notifyContract({
         recipientId: contract.provider_id,
         type: "DEADLINE_APPROACHING",
-        title: "اقترب موعد انتهاء العقد",
-        body: `يتبقى أقل من 24 ساعة على موعد انتهاء العقد (${endDateLabel}).`,
+        ...approachingDeadlineNotificationCopy("provider", endDateLabel),
         contractId: contract.id,
         ...contractNotificationMeta(contract),
+        canProposeExtension: true,
+        canApproveExtension: false,
       });
 
       await notifyContract({
         recipientId: contract.consumer_id,
         type: "DEADLINE_APPROACHING",
-        title: "اقترب موعد انتهاء العقد",
-        body: `يتبقى أقل من 24 ساعة على موعد انتهاء العقد (${endDateLabel}).`,
+        ...approachingDeadlineNotificationCopy("consumer", endDateLabel),
         contractId: contract.id,
         ...contractNotificationMeta(contract),
+        canProposeExtension: false,
+        canApproveExtension: true,
       });
 
       notifiedCount++;

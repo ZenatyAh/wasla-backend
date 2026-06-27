@@ -30,6 +30,8 @@ export type ContractNotificationMetadata = {
   fault?: string | null;
   providerCredits?: number | null;
   refundCredits?: number | null;
+  canProposeExtension?: boolean | null;
+  canApproveExtension?: boolean | null;
 };
 
 const toIsoDate = (value: Date | string | null | undefined) => {
@@ -95,6 +97,8 @@ const buildContractNotificationData = async (
       fault: metadata.fault ?? null,
       providerCredits: metadata.providerCredits ?? null,
       refundCredits: metadata.refundCredits ?? null,
+      canProposeExtension: metadata.canProposeExtension ?? null,
+      canApproveExtension: metadata.canApproveExtension ?? null,
     };
   }
 
@@ -197,6 +201,8 @@ export const createContractNotification = async (input: {
   fault?: string | null;
   providerCredits?: number | null;
   refundCredits?: number | null;
+  canProposeExtension?: boolean | null;
+  canApproveExtension?: boolean | null;
 }) => {
   const data = await buildContractNotificationData(input.contractId, {
     contractEndDate: input.contractEndDate,
@@ -205,6 +211,8 @@ export const createContractNotification = async (input: {
     fault: input.fault,
     providerCredits: input.providerCredits,
     refundCredits: input.refundCredits,
+    canProposeExtension: input.canProposeExtension,
+    canApproveExtension: input.canApproveExtension,
   });
 
   const notification = await prisma.notification.create({
