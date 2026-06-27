@@ -268,7 +268,50 @@ describe("OpenAPI spec", () => {
     assert.match(exchangesTag.description, /contract:notification:new/);
     assert.match(exchangesTag.description, /DEADLINE_APPROACHING/);
     assert.match(exchangesTag.description, /Every 15 minutes/);
+    assert.match(exchangesTag.description, /UC-TX-07/);
+    assert.match(exchangesTag.description, /CONTRACT_AUTO_COMPLETED/);
+    assert.match(exchangesTag.description, /CONTRACT_AUTO_DISPUTED/);
+
+    const reviewsTag = openApiSpec.tags.find(
+      (tag: { name?: string }) => tag.name === "Reviews",
+    );
+    assert.match(reviewsTag.description, /DISPUTED/);
+    assert.match(reviewsTag.description, /RELEASED/);
+
+    assert.match(notificationsTag.description, /CONTRACT_RESOLUTION_FAILED/);
+    assert.match(notificationsTag.description, /providerCredits/);
+    assert.match(notificationsTag.description, /fault/);
 
     assert.match(chatTag.description, /contract:notification:new/);
+  });
+
+  it("documents UC-TX-07 resolution schemas and review eligibility", () => {
+    const schemas = openApiSpec.components.schemas;
+
+    assert.ok("ResolutionFaultParty" in schemas);
+    assert.deepEqual(schemas.ResolutionFaultParty.enum, [
+      "NONE",
+      "SEEKER",
+      "PROVIDER",
+    ]);
+
+    assert.ok("WorkSessionStatus" in schemas);
+    assert.deepEqual(schemas.WorkSessionStatus.enum, [
+      "PENDING_CONFIRMATION",
+      "CONFIRMED",
+      "REJECTED",
+    ]);
+
+    assert.match(schemas.ExchangeStatus.description, /DISPUTED/);
+    assert.match(schemas.EscrowStatus.description, /REFUNDED/);
+
+    const reviewPost = openApiSpec.paths["/reviews"].post;
+    assert.match(reviewPost.description, /auto-resolution/);
+    assert.match(reviewPost.description, /HELD/);
+
+    const notificationData = schemas.NotificationContractData;
+    assert.ok(notificationData.properties.fault);
+    assert.ok(notificationData.properties.providerCredits);
+    assert.ok(notificationData.properties.refundCredits);
   });
 });

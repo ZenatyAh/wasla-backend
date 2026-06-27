@@ -11,7 +11,12 @@ const contractDeadlineWorkflow =
   "Only the provider may propose an extension; only the requester may approve or reject it. " +
   "On approval, `contractEndDate` is updated and any prior deadline reminder is reset. " +
   "Hourly cron sends `DEADLINE_APPROACHING` to both parties when less than 24 hours remain (once per deadline). " +
-  "Every 15 minutes, cron auto-resolves active contracts past `contractEndDate`: full completion emits `CONTRACT_AUTO_COMPLETED`; partial completion uses last-session fault rules and emits `CONTRACT_AUTO_DISPUTED`; failures emit `CONTRACT_RESOLUTION_FAILED`.";
+  "Every 15 minutes, cron auto-resolves active contracts (`IN_PROGRESS` or `WAITING_CONFIRMATION`) past `contractEndDate` (UC-TX-07). " +
+  "**Alt 1 — full completion:** when confirmed session hours equal `duration`, status becomes `COMPLETED`, escrow `RELEASED`, provider receives full credits → `CONTRACT_AUTO_COMPLETED`. " +
+  "**Alt 2 — seeker fault:** when hours are short and the last session is `PENDING_CONFIRMATION`, status becomes `DISPUTED`, escrow `RELEASED`, provider receives confirmed hours only, remainder refunded → `CONTRACT_AUTO_DISPUTED` (`fault: SEEKER`). " +
+  "**Alt 2 — provider fault:** when hours are short and there is no last pending session (no sessions, or last session `CONFIRMED`/`REJECTED`), status becomes `DISPUTED`, escrow `REFUNDED`, full `duration` refunded to requester → `CONTRACT_AUTO_DISPUTED` (`fault: PROVIDER`). " +
+  "Resolution failures notify both parties with `CONTRACT_RESOLUTION_FAILED`. " +
+  "Manual disputes opened via cancel/dispute keep escrow `HELD` until admin resolution; auto-resolved disputes settle escrow immediately.";
 
 export const openApiSpec = {
   openapi: "3.0.3",
@@ -19,7 +24,7 @@ export const openApiSpec = {
     title: "Wasla Backend API",
     version: "1.0.0",
     description:
-      "API documentation for Wasla backend including auth, posts, skills, chat, contract (exchange) lifecycle with deadline management, in-app notifications, and Socket.IO real-time events.",
+      "API documentation for Wasla backend including auth, posts, skills, chat, contract (exchange) lifecycle with escrow, work sessions, deadline auto-resolution (UC-TX-07), in-app notifications, and Socket.IO real-time events.",
   },
   servers: [
     {
@@ -88,7 +93,9 @@ export const openApiSpec = {
         "| `PUT /exchanges/{id}/deadline/approve` | `DEADLINE_APPROVED` | Provider |\n" +
         "| `PUT /exchanges/{id}/deadline/reject` | `DEADLINE_REJECTED` | Provider |\n" +
         "| Cron approaching deadline (hourly) | `DEADLINE_APPROACHING` | Both parties |\n" +
-        "| Cron auto-resolve (every 15 min) | `CONTRACT_AUTO_COMPLETED`, `CONTRACT_AUTO_DISPUTED`, or `CONTRACT_RESOLUTION_FAILED` | Both parties |\n\n" +
+        "| Cron auto-resolve (every 15 min) — full completion | `CONTRACT_AUTO_COMPLETED` | Both parties |\n" +
+        "| Cron auto-resolve — partial (seeker/provider fault) | `CONTRACT_AUTO_DISPUTED` | Both parties |\n" +
+        "| Cron auto-resolve — failure | `CONTRACT_RESOLUTION_FAILED` | Both parties |\n\n" +
         "**Chat notification types** (payload `data`: `{ conversationId, messageId, postId? }`):\n" +
         "`NEW_MESSAGE` (also `chat:notification:new`). `CONVERSATION_STARTED` is reserved for future use.\n\n" +
         "Notification persistence failures are logged but never block the triggering HTTP action.",
@@ -99,7 +106,10 @@ export const openApiSpec = {
     },
     {
       name: "Reviews",
-      description: "Service exchange reviews and ratings",
+      description:
+        "Service exchange reviews and ratings. " +
+        "Reviews are allowed when the contract is `COMPLETED`, or when it is `DISPUTED` with escrow already settled (`RELEASED` or `REFUNDED`) after deadline auto-resolution. " +
+        "Manual disputes with escrow still `HELD` cannot be reviewed until resolved.",
     },
     {
       name: "Skills",
@@ -110,8 +120,9 @@ export const openApiSpec = {
       description:
         "Time-credit service exchange (contract) lifecycle with escrow: request, accept, reject, deliver, confirm, cancel, dispute, work sessions, and deadline extensions. " +
         contractDeadlineWorkflow +
-        " Most state transitions push an in-app notification via Socket.IO `notification:new` and `contract:notification:new` on room `user:{userId}` (see Notifications tag). " +
-        "No notification is sent for deliver, whole-contract confirm, or dispute.",
+        " Work sessions increment confirmed hours on requester approval; when confirmed hours reach `duration`, the contract auto-completes without waiting for the deadline. " +
+        "Most state transitions push an in-app notification via Socket.IO `notification:new` and `contract:notification:new` on room `user:{userId}` (see Notifications tag). " +
+        "No notification is sent for deliver, whole-contract confirm, or manual dispute.",
     },
     {
       name: "Wallet",
@@ -1277,7 +1288,9 @@ export const openApiSpec = {
         description:
           "Paginated inbox history. For real-time delivery, listen for Socket.IO events `notification:new` (all types) and/or `contract:notification:new` (contract types only) on room `user:{userId}` " +
           "(auto-joined on connect). Call this endpoint on app load, pull-to-refresh, and after reconnect to reconcile missed events. " +
-          "Contract notifications include `data.contractId`, `data.contractEndDate`, `data.proposedEndDate`, and `data.status`; chat notifications include `data.conversationId` and `data.messageId`.",
+          "Contract notifications include `data.contractId`, `data.contractEndDate`, `data.proposedEndDate`, and `data.status`. " +
+          "Auto-resolution notifications also include `data.fault` (`NONE`, `SEEKER`, or `PROVIDER`), `data.providerCredits`, and `data.refundCredits`. " +
+          "Chat notifications include `data.conversationId` and `data.messageId`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "cursor", in: "query", schema: { type: "string" } },
@@ -1306,9 +1319,30 @@ export const openApiSpec = {
                         contractEndDate: "2026-07-01T00:00:00.000Z",
                         proposedEndDate: null,
                         status: "IN_PROGRESS",
+                        fault: null,
+                        providerCredits: null,
+                        refundCredits: null,
                       },
                       isRead: false,
                       createdAt: "2026-06-27T12:00:00.000Z",
+                    },
+                    {
+                      id: "clxyz456",
+                      userId: 5,
+                      type: "CONTRACT_AUTO_DISPUTED",
+                      title: "تم إنهاء العقد مع نزاع",
+                      body: "انتهت مدة العقد ولم يتم تأكيد آخر جلسة عمل. تم تحويل الساعات المؤكدة لمقدم الخدمة وإرجاع المتبقي.",
+                      data: {
+                        contractId: 42,
+                        contractEndDate: "2026-07-01T00:00:00.000Z",
+                        proposedEndDate: null,
+                        status: "DISPUTED",
+                        fault: "SEEKER",
+                        providerCredits: 2,
+                        refundCredits: 3,
+                      },
+                      isRead: false,
+                      createdAt: "2026-07-02T00:15:00.000Z",
                     },
                   ],
                   nextCursor: null,
@@ -1569,7 +1603,10 @@ export const openApiSpec = {
     "/reviews": {
       post: {
         tags: ["Reviews"],
-        summary: "Submit a review for a completed service exchange",
+        summary: "Submit a review for a completed or auto-resolved service exchange",
+        description:
+          "Participant-only. Allowed when the contract is `COMPLETED`, or `DISPUTED` with escrow already settled (`RELEASED` or `REFUNDED`) after deadline auto-resolution. " +
+          "Manual disputes with escrow `HELD` return 400. One review per participant per contract.",
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -2026,7 +2063,8 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Open a dispute on a contract",
         description:
-          "Participant-only. The contract must be IN_PROGRESS or WAITING_CONFIRMATION. Moves it to DISPUTED; credits remain frozen in escrow until an admin resolves it. No notification is sent.",
+          "Participant-only. The contract must be IN_PROGRESS or WAITING_CONFIRMATION. Moves it to DISPUTED; credits remain frozen in escrow (`HELD`) until an admin resolves it. " +
+          "This differs from deadline auto-resolution, which settles escrow automatically and may also set status to DISPUTED. No notification is sent.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -2135,7 +2173,8 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Confirm a work session",
         description:
-          "Requester only. Approves logged hours. " +
+          "Requester only. Approves logged hours and adds them to the contract's confirmed total. " +
+          "When confirmed hours reach `duration`, the contract auto-completes (`COMPLETED` / escrow `RELEASED`) in the same transaction. " +
           contractNotificationDelivery("SESSION_CONFIRMED", "provider"),
         security: [{ bearerAuth: [] }],
         parameters: [
@@ -2833,13 +2872,23 @@ export const openApiSpec = {
         type: "object",
         properties: {
           id: { type: "integer", example: 1 },
-          exchangeId: { type: "integer", example: 1 },
+          contract_id: { type: "integer", example: 1, description: "Parent contract ID" },
+          session_number: { type: "integer", example: 1 },
           hours: { type: "integer", example: 2 },
           notes: { type: "string", nullable: true, example: "Worked on UI" },
-          status: { type: "string", example: "PENDING_CONFIRMATION" },
-          createdAt: { type: "string", format: "date-time" },
-          updatedAt: { type: "string", format: "date-time" },
+          status: {
+            $ref: "#/components/schemas/WorkSessionStatus",
+          },
+          created_at: { type: "string", format: "date-time" },
+          confirmed_at: { type: "string", format: "date-time", nullable: true },
         },
+      },
+      WorkSessionStatus: {
+        type: "string",
+        enum: ["PENDING_CONFIRMATION", "CONFIRMED", "REJECTED"],
+        example: "PENDING_CONFIRMATION",
+        description:
+          "Last session status drives deadline auto-resolution fault when confirmed hours are below `duration`.",
       },
       CreateSessionRequest: {
         type: "object",
@@ -3343,7 +3392,9 @@ export const openApiSpec = {
           "CONTRACT_AUTO_DISPUTED",
           "CONTRACT_RESOLUTION_FAILED",
         ],
-        description: "In-app notification category aligned with the Prisma `NotificationType` enum.",
+        description:
+          "In-app notification category aligned with the Prisma `NotificationType` enum. " +
+          "`CONTRACT_AUTO_RESOLVED` is legacy; deadline cron now emits `CONTRACT_AUTO_COMPLETED`, `CONTRACT_AUTO_DISPUTED`, or `CONTRACT_RESOLUTION_FAILED`.",
       },
       NotificationContractData: {
         type: "object",
@@ -3393,7 +3444,10 @@ export const openApiSpec = {
           contractId: 42,
           contractEndDate: "2026-07-01T00:00:00.000Z",
           proposedEndDate: null,
-          status: "IN_PROGRESS",
+          status: "DISPUTED",
+          fault: "SEEKER",
+          providerCredits: 2,
+          refundCredits: 3,
         },
       },
       NotificationMessageData: {
@@ -3422,19 +3476,22 @@ export const openApiSpec = {
           "(EXCHANGE_*, SESSION_*, DEADLINE_*, DEADLINE_APPROACHING, CONTRACT_AUTO_*). " +
           "Also emitted as `notification:new`. See `NotificationContractData` for the `data` payload shape.",
         example: {
-          id: "clxyz123",
+          id: "clxyz456",
           userId: 5,
-          type: "EXCHANGE_REQUESTED",
-          title: "طلب خدمة جديد",
-          body: "هناك شخص يطلب إحدى خدماتك. موعد انتهاء العقد: ١‏/٧‏/٢٠٢٦.",
+          type: "CONTRACT_AUTO_DISPUTED",
+          title: "تم إنهاء العقد مع نزاع",
+          body: "انتهت مدة العقد ولم يتم تأكيد آخر جلسة عمل. تم تحويل الساعات المؤكدة لمقدم الخدمة وإرجاع المتبقي.",
           data: {
             contractId: 42,
             contractEndDate: "2026-07-01T00:00:00.000Z",
             proposedEndDate: null,
-            status: "PENDING",
+            status: "DISPUTED",
+            fault: "SEEKER",
+            providerCredits: 2,
+            refundCredits: 3,
           },
           isRead: false,
-          createdAt: "2026-06-27T12:00:00.000Z",
+          createdAt: "2026-07-02T00:15:00.000Z",
         },
       },
       Notification: {
@@ -3681,7 +3738,8 @@ export const openApiSpec = {
       ExchangeStatus: {
         type: "string",
         description:
-          "PUT /exchanges/{id}/accept sets IN_PROGRESS (not ACCEPTED). ACCEPTED is a legacy DB enum value and is not returned by the accept endpoint.",
+          "PUT /exchanges/{id}/accept sets IN_PROGRESS (not ACCEPTED). ACCEPTED is a legacy DB enum value and is not returned by the accept endpoint. " +
+          "DISPUTED may be manual (escrow HELD, admin resolution pending) or from deadline auto-resolution (escrow RELEASED or REFUNDED, credits settled).",
         enum: [
           "PENDING",
           "ACCEPTED",
@@ -3698,6 +3756,15 @@ export const openApiSpec = {
         type: "string",
         enum: ["NONE", "HELD", "RELEASED", "REFUNDED"],
         example: "NONE",
+        description:
+          "NONE before acceptance; HELD while active or manual dispute; RELEASED after completion or seeker-fault auto-resolution; REFUNDED after provider-fault auto-resolution or provider cancel.",
+      },
+      ResolutionFaultParty: {
+        type: "string",
+        enum: ["NONE", "SEEKER", "PROVIDER"],
+        example: "NONE",
+        description:
+          "Set on deadline auto-resolution. NONE for full completion; SEEKER when last session was pending confirmation; PROVIDER when hours were not fully logged/confirmed.",
       },
       CreateExchangeRequest: {
         type: "object",
@@ -3831,7 +3898,8 @@ export const openApiSpec = {
             type: "string",
             enum: ["completed", "refunded", "held", "disputed", "cancelled"],
             description:
-              "Ledger rows use completed or refunded. Active escrow rows use held or disputed. Cancelled contracts use cancelled.",
+              "Ledger rows use completed or refunded. Active escrow rows use held or disputed (only when escrow_status is HELD). " +
+              "Cancelled contracts use cancelled. Settled auto-resolved disputes no longer appear as held/disputed in wallet history.",
           },
           timestamp: { type: "string", format: "date-time" },
         },
