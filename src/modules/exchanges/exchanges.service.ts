@@ -4,9 +4,49 @@ import {
   derivePostCategory,
   type PostForMapping,
 } from "../recommender/recommender.mapper.js";
-import { createContractNotification } from "../notifications/notification.service.js";
+import { createContractNotification, logContractNotificationFailure } from "../notifications/notification.service.js";
 import { ExchangeError } from "./exchanges.errors.js";
 import type { CreateExchangeInput, ListExchangesQuery, CreateSessionInput, DeadlineExtensionInput } from "./exchanges.schema.js";
+
+const formatContractDate = (value: Date | string) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  try {
+    return date.toLocaleDateString("ar-EG");
+  } catch {
+    return date.toISOString();
+  }
+};
+
+const contractNotificationMeta = (exchange: {
+  maximum_end_date: Date;
+  proposed_end_date?: Date | null;
+  status: string;
+}) => ({
+  contractEndDate: exchange.maximum_end_date,
+  proposedEndDate: exchange.proposed_end_date ?? null,
+  status: exchange.status,
+});
+
+const contractNotificationMetaFromResponse = (exchange: {
+  contractEndDate: Date | string;
+  proposedEndDate?: Date | string | null;
+  status: string;
+}) => ({
+  contractEndDate: exchange.contractEndDate,
+  proposedEndDate: exchange.proposedEndDate ?? null,
+  status: exchange.status,
+});
+
+const notifyContract = (
+  input: Parameters<typeof createContractNotification>[0],
+) =>
+  createContractNotification(input).catch((err) =>
+    logContractNotificationFailure(input, err),
+  );
 
 const exchangeSelect = {
   id: true,
@@ -210,13 +250,14 @@ export const requestExchange = async (
     action: "apply",
   });
 
-  await createContractNotification({
+  await notifyContract({
     recipientId: data.providerId,
     type: "EXCHANGE_REQUESTED",
     title: "طلب خدمة جديد",
-    body: `هناك شخص يطلب إحدى خدماتك. موعد انتهاء العقد: ${data.contractEndDate.toLocaleDateString("ar-EG")}.`,
+    body: `هناك شخص يطلب إحدى خدماتك. موعد انتهاء العقد: ${formatContractDate(data.contractEndDate)}.`,
     contractId: exchange.id,
-  }).catch((err) => console.error("Notification failed", err));
+    ...contractNotificationMeta(exchange as ExchangeRecord),
+  });
 
   return toExchangeResponse(exchange as ExchangeRecord);
 };
@@ -277,13 +318,14 @@ export const acceptExchange = async (id: number, providerId: number) => {
 
   const result = await fetchExchange(id);
 
-  await createContractNotification({
+  await notifyContract({
     recipientId: result.requesterId,
     type: "EXCHANGE_ACCEPTED",
     title: "تم قبول طلبك",
     body: "تم قبول طلب الخدمة الخاص بك، وهو الآن قيد التنفيذ.",
     contractId: result.id,
-  }).catch((err) => console.error("Notification failed", err));
+    ...contractNotificationMetaFromResponse(result),
+  });
 
   return result;
 };
@@ -315,13 +357,14 @@ export const rejectExchange = async (id: number, providerId: number) => {
 
   const result = await fetchExchange(id);
 
-  await createContractNotification({
+  await notifyContract({
     recipientId: result.requesterId,
     type: "EXCHANGE_REJECTED",
     title: "تم رفض طلبك",
     body: "تم رفض طلب الخدمة الخاص بك.",
     contractId: result.id,
-  }).catch((err) => console.error("Notification failed", err));
+    ...contractNotificationMetaFromResponse(result),
+  });
 
   return result;
 };
@@ -532,13 +575,14 @@ export const cancelExchange = async (id: number, userId: number) => {
   const result = await fetchExchange(id);
 
   const recipientId = userId === result.providerId ? result.requesterId : result.providerId;
-  await createContractNotification({
+  await notifyContract({
     recipientId,
     type: "EXCHANGE_CANCELED",
     title: "تم إلغاء الطلب",
     body: "تم إلغاء طلب الخدمة.",
     contractId: result.id,
-  }).catch((err) => console.error("Notification failed", err));
+    ...contractNotificationMetaFromResponse(result),
+  });
 
   return result;
 };
@@ -674,13 +718,14 @@ export const recordWorkSession = async (
 
   const exchange = await prisma.serviceExchange.findUnique({ where: { id: contractId } });
   if (exchange) {
-    await createContractNotification({
+    await notifyContract({
       recipientId: exchange.consumer_id,
       type: "SESSION_RECORDED",
       title: "تم تسجيل جلسة عمل جديدة",
       body: "قام مقدم الخدمة بتسجيل جلسة عمل جديدة، يرجى مراجعتها.",
       contractId: exchange.id,
-    }).catch((err) => console.error("Notification failed", err));
+      ...contractNotificationMeta(exchange),
+    });
   }
 
   return result;
@@ -775,13 +820,14 @@ export const confirmWorkSession = async (
 
   const exchange = await prisma.serviceExchange.findUnique({ where: { id: contractId } });
   if (exchange) {
-    await createContractNotification({
+    await notifyContract({
       recipientId: exchange.provider_id,
       type: "SESSION_CONFIRMED",
       title: "تم تأكيد جلسة العمل",
       body: "قام طالب الخدمة بتأكيد جلسة العمل الخاصة بك.",
       contractId: exchange.id,
-    }).catch((err) => console.error("Notification failed", err));
+      ...contractNotificationMeta(exchange),
+    });
   }
 
   return result;
@@ -794,7 +840,14 @@ export const rejectWorkSession = async (
 ) => {
   const exchange = await prisma.serviceExchange.findUnique({
     where: { id: contractId },
-    select: { id: true, consumer_id: true, provider_id: true },
+    select: {
+      id: true,
+      consumer_id: true,
+      provider_id: true,
+      maximum_end_date: true,
+      proposed_end_date: true,
+      status: true,
+    },
   });
 
   if (!exchange) {
@@ -820,13 +873,14 @@ export const rejectWorkSession = async (
     data: { status: "REJECTED" },
   });
 
-  await createContractNotification({
+  await notifyContract({
     recipientId: exchange.provider_id,
     type: "SESSION_REJECTED",
     title: "تم رفض جلسة العمل",
     body: "قام طالب الخدمة برفض جلسة العمل الخاصة بك.",
     contractId: exchange.id,
-  }).catch((err) => console.error("Notification failed", err));
+    ...contractNotificationMeta(exchange),
+  });
 
   return result;
 };
@@ -871,13 +925,17 @@ export const proposeDeadlineExtension = async (
     select: exchangeSelect,
   });
 
-  await createContractNotification({
+  await notifyContract({
     recipientId: exchange.consumer_id,
     type: "DEADLINE_PROPOSED",
     title: "تم اقتراح موعد تسليم جديد",
-    body: `قام مقدم الخدمة باقتراح موعد تسليم جديد: ${data.proposedEndDate.toLocaleDateString("ar-EG")}.`,
+    body: `قام مقدم الخدمة باقتراح موعد تسليم جديد: ${formatContractDate(data.proposedEndDate)}.`,
     contractId: exchange.id,
-  }).catch((err) => console.error("Notification failed", err));
+    ...contractNotificationMeta({
+      ...exchange,
+      proposed_end_date: data.proposedEndDate,
+    }),
+  });
 
   return toExchangeResponse(result as ExchangeRecord);
 };
@@ -901,13 +959,18 @@ export const approveDeadlineExtension = async (contractId: number, consumerId: n
     select: exchangeSelect,
   });
 
-  await createContractNotification({
+  await notifyContract({
     recipientId: exchange.provider_id,
     type: "DEADLINE_APPROVED",
     title: "تم الموافقة على الموعد الجديد",
-    body: `تم الموافقة على موعد التسليم الجديد: ${exchange.proposed_end_date.toLocaleDateString("ar-EG")}.`,
+    body: `تم الموافقة على موعد التسليم الجديد: ${formatContractDate(exchange.proposed_end_date)}.`,
     contractId: exchange.id,
-  }).catch((err) => console.error("Notification failed", err));
+    ...contractNotificationMeta({
+      maximum_end_date: exchange.proposed_end_date,
+      proposed_end_date: null,
+      status: exchange.status,
+    }),
+  });
 
   return toExchangeResponse(result as ExchangeRecord);
 };
@@ -927,13 +990,17 @@ export const rejectDeadlineExtension = async (contractId: number, consumerId: nu
     select: exchangeSelect,
   });
 
-  await createContractNotification({
+  await notifyContract({
     recipientId: exchange.provider_id,
     type: "DEADLINE_REJECTED",
     title: "تم رفض الموعد المقترح",
     body: "تم رفض موعد التسليم الجديد المقترح.",
     contractId: exchange.id,
-  }).catch((err) => console.error("Notification failed", err));
+    ...contractNotificationMeta({
+      ...exchange,
+      proposed_end_date: null,
+    }),
+  });
 
   return toExchangeResponse(result as ExchangeRecord);
 };
@@ -953,7 +1020,7 @@ export const notifyApproachingDeadlines = async () => {
   let notifiedCount = 0;
 
   for (const contract of contracts) {
-    const endDateLabel = contract.maximum_end_date.toLocaleDateString("ar-EG");
+    const endDateLabel = formatContractDate(contract.maximum_end_date);
 
     try {
       await prisma.serviceExchange.update({
@@ -961,21 +1028,23 @@ export const notifyApproachingDeadlines = async () => {
         data: { deadline_reminder_sent_at: now },
       });
 
-      await createContractNotification({
+      await notifyContract({
         recipientId: contract.provider_id,
         type: "DEADLINE_APPROACHING",
         title: "اقترب موعد انتهاء العقد",
         body: `يتبقى أقل من 24 ساعة على موعد انتهاء العقد (${endDateLabel}).`,
         contractId: contract.id,
-      }).catch((err) => console.error("Notification failed", err));
+        ...contractNotificationMeta(contract),
+      });
 
-      await createContractNotification({
+      await notifyContract({
         recipientId: contract.consumer_id,
         type: "DEADLINE_APPROACHING",
         title: "اقترب موعد انتهاء العقد",
         body: `يتبقى أقل من 24 ساعة على موعد انتهاء العقد (${endDateLabel}).`,
         contractId: contract.id,
-      }).catch((err) => console.error("Notification failed", err));
+        ...contractNotificationMeta(contract),
+      });
 
       notifiedCount++;
     } catch (error) {
@@ -1065,21 +1134,29 @@ export const resolveExpiredContracts = async () => {
         });
       });
 
-      await createContractNotification({
+      await notifyContract({
         recipientId: contract.provider_id,
         type: "CONTRACT_AUTO_RESOLVED",
         title: "تم إنهاء العقد تلقائياً",
         body: "تم إنهاء العقد تلقائياً لانتهاء المدة المتفق عليها.",
         contractId: contract.id,
-      }).catch((err) => console.error("Notification failed", err));
+        ...contractNotificationMeta({
+          ...contract,
+          status: "COMPLETED",
+        }),
+      });
 
-      await createContractNotification({
+      await notifyContract({
         recipientId: contract.consumer_id,
         type: "CONTRACT_AUTO_RESOLVED",
         title: "تم إنهاء العقد تلقائياً",
         body: "تم إنهاء العقد تلقائياً لانتهاء المدة المتفق عليها.",
         contractId: contract.id,
-      }).catch((err) => console.error("Notification failed", err));
+        ...contractNotificationMeta({
+          ...contract,
+          status: "COMPLETED",
+        }),
+      });
 
       resolvedCount++;
     } catch (error) {

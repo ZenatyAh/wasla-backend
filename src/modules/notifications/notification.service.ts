@@ -20,6 +20,25 @@ const CONTRACT_NOTIFICATION_TYPES = new Set<NotificationType>([
   "CONTRACT_AUTO_RESOLVED",
 ]);
 
+export type ContractNotificationMetadata = {
+  contractEndDate?: Date | string | null;
+  proposedEndDate?: Date | string | null;
+  status?: string | null;
+};
+
+const toIsoDate = (value: Date | string | null | undefined) => {
+  if (value == null) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString();
+};
+
 const toNotificationResponse = (notification: {
   id: string;
   userId: number;
@@ -57,22 +76,65 @@ const publishNotificationToUser = (
   }
 };
 
-const buildContractNotificationData = async (contractId: number) => {
-  const exchange = await prisma.serviceExchange.findUnique({
-    where: { id: contractId },
-    select: {
-      maximum_end_date: true,
-      proposed_end_date: true,
-      status: true,
-    },
-  });
+const buildContractNotificationData = async (
+  contractId: number,
+  metadata?: ContractNotificationMetadata,
+) => {
+  if (metadata) {
+    return {
+      contractId,
+      contractEndDate: toIsoDate(metadata.contractEndDate),
+      proposedEndDate: toIsoDate(metadata.proposedEndDate),
+      status: metadata.status ?? null,
+    };
+  }
 
-  return {
-    contractId,
-    contractEndDate: exchange?.maximum_end_date.toISOString() ?? null,
-    proposedEndDate: exchange?.proposed_end_date?.toISOString() ?? null,
-    status: exchange?.status ?? null,
-  };
+  try {
+    const exchange = await prisma.serviceExchange.findUnique({
+      where: { id: contractId },
+      select: {
+        maximum_end_date: true,
+        proposed_end_date: true,
+        status: true,
+      },
+    });
+
+    return {
+      contractId,
+      contractEndDate: toIsoDate(exchange?.maximum_end_date),
+      proposedEndDate: toIsoDate(exchange?.proposed_end_date),
+      status: exchange?.status ?? null,
+    };
+  } catch (error) {
+    console.error("[ContractNotification] metadata lookup failed", {
+      contractId,
+      error: error instanceof Error ? error.message : error,
+    });
+
+    return {
+      contractId,
+      contractEndDate: null,
+      proposedEndDate: null,
+      status: null,
+    };
+  }
+};
+
+export const logContractNotificationFailure = (
+  input: {
+    type: NotificationType;
+    contractId: number;
+    recipientId: number;
+  },
+  error: unknown,
+) => {
+  console.error("[ContractNotification] failed", {
+    type: input.type,
+    contractId: input.contractId,
+    recipientId: input.recipientId,
+    error: error instanceof Error ? error.message : error,
+    stack: error instanceof Error ? error.stack : undefined,
+  });
 };
 
 export const createMessageNotification = async (input: {
@@ -120,8 +182,15 @@ export const createContractNotification = async (input: {
   title: string;
   body: string;
   contractId: number;
+  contractEndDate?: Date | string | null;
+  proposedEndDate?: Date | string | null;
+  status?: string | null;
 }) => {
-  const data = await buildContractNotificationData(input.contractId);
+  const data = await buildContractNotificationData(input.contractId, {
+    contractEndDate: input.contractEndDate,
+    proposedEndDate: input.proposedEndDate,
+    status: input.status,
+  });
 
   const notification = await prisma.notification.create({
     data: {
