@@ -208,7 +208,13 @@ describe("OpenAPI spec", () => {
     assert.ok("ChatPresenceOfflineEvent" in schemas);
     assert.ok("NotificationType" in schemas);
     assert.ok("NotificationNewEvent" in schemas);
+    assert.ok("ContractNotificationNewEvent" in schemas);
     assert.ok("NotificationContractData" in schemas);
+
+    const contractData = schemas.NotificationContractData.properties;
+    assert.ok("contractEndDate" in contractData);
+    assert.ok("proposedEndDate" in contractData);
+    assert.ok("status" in contractData);
 
     const sendSchema = schemas.SendMessageRequest;
     assert.ok(Array.isArray(sendSchema.required));
@@ -250,5 +256,15 @@ describe("OpenAPI spec", () => {
     assert.match(notificationsTag.description, /CONTRACT_AUTO_RESOLVED/);
     assert.match(notificationsTag.description, /contract:notification:new/);
     assert.match(notificationsTag.description, /DEADLINE_APPROACHING/);
+    assert.match(notificationsTag.description, /maximum_end_date/);
+
+    const exchangesTag = openApiSpec.tags.find(
+      (tag: { name?: string }) => tag.name === "Exchanges",
+    );
+    assert.match(exchangesTag.description, /contract:notification:new/);
+    assert.match(exchangesTag.description, /DEADLINE_APPROACHING/);
+    assert.match(exchangesTag.description, /Every 15 minutes/);
+
+    assert.match(chatTag.description, /contract:notification:new/);
   });
 });

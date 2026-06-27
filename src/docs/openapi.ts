@@ -1,10 +1,25 @@
+const contractNotificationDelivery = (
+  type: string,
+  recipient: string,
+) =>
+  `Pushes \`${type}\` to the ${recipient} via Socket.IO \`notification:new\` and \`contract:notification:new\` on room \`user:{userId}\`. ` +
+  "Notification `data` includes `contractId`, `contractEndDate`, `proposedEndDate`, and `status`.";
+
+const contractDeadlineWorkflow =
+  "**Contract deadline (`maximum_end_date`):** the requester sets it at creation as `contractEndDate` (legacy alias `maximumEndDate`). " +
+  "It is returned as `contractEndDate`; a pending extension is `proposedEndDate`. " +
+  "Only the provider may propose an extension; only the requester may approve or reject it. " +
+  "On approval, `contractEndDate` is updated and any prior deadline reminder is reset. " +
+  "Hourly cron sends `DEADLINE_APPROACHING` to both parties when less than 24 hours remain (once per deadline). " +
+  "Every 15 minutes, cron auto-resolves active contracts past `contractEndDate` (`CONTRACT_AUTO_RESOLVED`, credits split by completed hours).";
+
 export const openApiSpec = {
   openapi: "3.0.3",
   info: {
     title: "Wasla Backend API",
     version: "1.0.0",
     description:
-      "API documentation for Wasla backend including auth, posts, skills, chat, contract (exchange) lifecycle, notifications, and Socket.IO real-time events.",
+      "API documentation for Wasla backend including auth, posts, skills, chat, contract (exchange) lifecycle with deadline management, in-app notifications, and Socket.IO real-time events.",
   },
   servers: [
     {
@@ -40,13 +55,13 @@ export const openApiSpec = {
         "Retrying the same UUID returns HTTP 200 with the existing message (no duplicate row).\n\n" +
         "**Socket.IO connection:** pass access JWT in `auth.token`. Engine heartbeat: ping every 10s, disconnect if no pong within 5s.\n\n" +
         "**Socket rooms (channels):**\n" +
-        "- `user:{userId}` — auto-joined on connect; receives `notification:new` (all in-app notifications) and `chat:notification:new` (deprecated alias for chat only)\n" +
+        "- `user:{userId}` — auto-joined on connect; receives `notification:new` (all in-app notifications), `chat:notification:new` (deprecated alias for chat only), and `contract:notification:new` (contract lifecycle types)\n" +
         "- `conversation:{conversationId}` — join via client event `chat:join`; receives chat message and presence events for that conversation\n\n" +
         "**Client → server events:** `chat:join`, `chat:leave`, `chat:messages:delivered`, `chat:messages:read` " +
         "(see `ChatMessagesDeliveredPayload`, `ChatMessagesReadPayload`).\n\n" +
         "**Server → client events:** `chat:message:new`, `chat:message:sent`, `chat:message:edited`, `chat:message:deleted`, " +
         "`chat:message:read`, `chat:messages:status`, `chat:presence:online`, `chat:presence:offline`, " +
-        "`notification:new`, `chat:notification:new` (deprecated alias for `NEW_MESSAGE`), `chat:error` " +
+        "`notification:new`, `chat:notification:new` (deprecated alias for `NEW_MESSAGE`), `contract:notification:new` (contract lifecycle types), `chat:error` " +
         "(see corresponding `Chat*Event` schemas).",
     },
     {
@@ -55,10 +70,11 @@ export const openApiSpec = {
         "In-app notifications for chat messages and contract lifecycle events. No email is sent for contract notifications.\n\n" +
         "**Real-time delivery:** server emits Socket.IO event `notification:new` on personal room `user:{userId}` (auto-joined on connect). " +
         "For `NEW_MESSAGE` only, a deprecated alias `chat:notification:new` is also emitted on the same room. " +
-        "For contract lifecycle types, `contract:notification:new` is also emitted on the same room.\n\n" +
+        "For contract lifecycle types, `contract:notification:new` is also emitted on the same room (clients may subscribe to either event).\n\n" +
         "**REST inbox:** `GET /notifications` for history/pagination; `PATCH /notifications/:id/read` and `PATCH /notifications/read-all` for read state. " +
         "Call REST on app load and after reconnect to reconcile missed socket events.\n\n" +
-        "**Contract notification types** (payload `data`: `{ contractId, contractEndDate, proposedEndDate, status }`):\n\n" +
+        contractDeadlineWorkflow +
+        "\n\n**Contract notification types** (payload `data`: `{ contractId, contractEndDate, proposedEndDate, status }`):\n\n" +
         "| Operation | Type | Recipient |\n" +
         "|-----------|------|----------|\n" +
         "| `POST /exchanges/request` | `EXCHANGE_REQUESTED` | Provider |\n" +
@@ -93,8 +109,9 @@ export const openApiSpec = {
       name: "Exchanges",
       description:
         "Time-credit service exchange (contract) lifecycle with escrow: request, accept, reject, deliver, confirm, cancel, dispute, work sessions, and deadline extensions. " +
-        "Most state transitions push an in-app notification via Socket.IO `notification:new` on room `user:{userId}` (see Notifications tag). " +
-        "No notification is sent for deliver, whole-contract confirm, or dispute. Expired active contracts are auto-resolved every 15 minutes (cron) with `CONTRACT_AUTO_RESOLVED` sent to both parties. Approaching deadlines trigger `DEADLINE_APPROACHING` hourly when less than 24 hours remain.",
+        contractDeadlineWorkflow +
+        " Most state transitions push an in-app notification via Socket.IO `notification:new` and `contract:notification:new` on room `user:{userId}` (see Notifications tag). " +
+        "No notification is sent for deliver, whole-contract confirm, or dispute.",
     },
     {
       name: "Wallet",
@@ -1258,7 +1275,7 @@ export const openApiSpec = {
         tags: ["Notifications"],
         summary: "List notifications",
         description:
-          "Paginated inbox history. For real-time delivery, listen for Socket.IO event `notification:new` on room `user:{userId}` " +
+          "Paginated inbox history. For real-time delivery, listen for Socket.IO events `notification:new` (all types) and/or `contract:notification:new` (contract types only) on room `user:{userId}` " +
           "(auto-joined on connect). Call this endpoint on app load, pull-to-refresh, and after reconnect to reconcile missed events. " +
           "Contract notifications include `data.contractId`, `data.contractEndDate`, `data.proposedEndDate`, and `data.status`; chat notifications include `data.conversationId` and `data.messageId`.",
         security: [{ bearerAuth: [] }],
@@ -1276,6 +1293,26 @@ export const openApiSpec = {
             content: {
               "application/json": {
                 schema: { $ref: "#/components/schemas/NotificationListResponse" },
+                example: {
+                  notifications: [
+                    {
+                      id: "clxyz123",
+                      userId: 5,
+                      type: "DEADLINE_APPROACHING",
+                      title: "اقترب موعد انتهاء العقد",
+                      body: "يتبقى أقل من 24 ساعة على موعد انتهاء العقد (١‏/٧‏/٢٠٢٦).",
+                      data: {
+                        contractId: 42,
+                        contractEndDate: "2026-07-01T00:00:00.000Z",
+                        proposedEndDate: null,
+                        status: "IN_PROGRESS",
+                      },
+                      isRead: false,
+                      createdAt: "2026-06-27T12:00:00.000Z",
+                    },
+                  ],
+                  nextCursor: null,
+                },
               },
             },
           },
@@ -1659,7 +1696,8 @@ export const openApiSpec = {
         summary: "Request a service exchange (create contract)",
         description:
           "Creates a PENDING contract. No time credits are deducted at this stage. The requester is the authenticated user; you cannot request a service from yourself, and you must currently hold at least `duration` available credits. " +
-          "Pushes `EXCHANGE_REQUESTED` to the provider via Socket.IO `notification:new` on room `user:{userId}`.",
+          "`contractEndDate` (legacy alias `maximumEndDate`) is stored as the agreed deadline and included in the notification payload. " +
+          contractNotificationDelivery("EXCHANGE_REQUESTED", "provider"),
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -1783,7 +1821,7 @@ export const openApiSpec = {
         summary: "Accept a contract (provider only)",
         description:
           "Provider-only. The contract must be PENDING. Runs in a serializable transaction: re-checks the requester's available credits, then deducts `duration` from available and moves it into escrow (HELD). Fails if the requester no longer has enough credits. " +
-          "Pushes `EXCHANGE_ACCEPTED` to the requester via Socket.IO `notification:new` on room `user:{userId}`.",
+          contractNotificationDelivery("EXCHANGE_ACCEPTED", "requester"),
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1829,7 +1867,7 @@ export const openApiSpec = {
         summary: "Reject a contract (provider only)",
         description:
           "Provider-only. The contract must be PENDING. No credit changes. " +
-          "Pushes `EXCHANGE_REJECTED` to the requester via Socket.IO `notification:new` on room `user:{userId}`.",
+          contractNotificationDelivery("EXCHANGE_REJECTED", "requester"),
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1942,7 +1980,8 @@ export const openApiSpec = {
         summary: "Cancel a contract",
         description:
           "If PENDING: either participant may cancel (no credit changes), moving it to CANCELED. If IN_PROGRESS or WAITING_CONFIRMATION: a provider cancel refunds the escrow to the requester (CANCELED / REFUNDED), while a requester cancel cannot unilaterally close it and instead escalates to DISPUTED with credits left frozen. " +
-          "When status becomes CANCELED, pushes `EXCHANGE_CANCELED` to the other party via Socket.IO `notification:new` on room `user:{userId}`.",
+          "When status becomes CANCELED, " +
+          contractNotificationDelivery("EXCHANGE_CANCELED", "other party"),
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -2055,7 +2094,8 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Log a new work session",
         description:
-          "Provider only. Logs hours worked. Pushes `SESSION_RECORDED` to the requester via Socket.IO `notification:new` on room `user:{userId}`.",
+          "Provider only. Logs hours worked. " +
+          contractNotificationDelivery("SESSION_RECORDED", "requester"),
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -2095,7 +2135,8 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Confirm a work session",
         description:
-          "Requester only. Approves logged hours. Pushes `SESSION_CONFIRMED` to the provider via Socket.IO `notification:new` on room `user:{userId}`.",
+          "Requester only. Approves logged hours. " +
+          contractNotificationDelivery("SESSION_CONFIRMED", "provider"),
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "integer" } },
@@ -2109,7 +2150,7 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Reject a work session",
         description:
-          "Requester only. Pushes `SESSION_REJECTED` to the provider via Socket.IO `notification:new` on room `user:{userId}`.",
+          "Requester only. " + contractNotificationDelivery("SESSION_REJECTED", "provider"),
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "integer" } },
@@ -2123,8 +2164,8 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Propose a new deadline",
         description:
-          "Provider only. Contract must be IN_PROGRESS or WAITING_CONFIRMATION. " +
-          "Pushes `DEADLINE_PROPOSED` to the requester via Socket.IO `notification:new` on room `user:{userId}`.",
+          "Provider only. Contract must be IN_PROGRESS or WAITING_CONFIRMATION. Stores the proposal in `proposedEndDate` without changing `contractEndDate` until the requester approves. " +
+          contractNotificationDelivery("DEADLINE_PROPOSED", "requester"),
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "integer" } },
@@ -2137,7 +2178,21 @@ export const openApiSpec = {
             },
           },
         },
-        responses: { "200": { description: "Deadline proposed" } },
+        responses: {
+          "200": {
+            description: "Deadline proposed; stored in `proposedEndDate`",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    exchange: { $ref: "#/components/schemas/Exchange" },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
     "/exchanges/{id}/deadline/approve": {
@@ -2145,13 +2200,27 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Approve a proposed deadline",
         description:
-          "Requester only. Requires a pending `proposedEndDate`. " +
-          "Pushes `DEADLINE_APPROVED` to the provider via Socket.IO `notification:new` on room `user:{userId}`.",
+          "Requester only. Requires a pending `proposedEndDate`. Updates `contractEndDate` to the approved value, clears `proposedEndDate`, and resets the deadline reminder flag so a new `DEADLINE_APPROACHING` can fire for the new date. " +
+          contractNotificationDelivery("DEADLINE_APPROVED", "provider"),
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "integer" } },
         ],
-        responses: { "200": { description: "Deadline approved" } },
+        responses: {
+          "200": {
+            description: "Deadline approved; `contractEndDate` updated",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    exchange: { $ref: "#/components/schemas/Exchange" },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
     "/exchanges/{id}/deadline/reject": {
@@ -2159,13 +2228,27 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Reject a proposed deadline",
         description:
-          "Requester only. Requires a pending `proposedEndDate`. " +
-          "Pushes `DEADLINE_REJECTED` to the provider via Socket.IO `notification:new` on room `user:{userId}`.",
+          "Requester only. Requires a pending `proposedEndDate`. Clears `proposedEndDate`; `contractEndDate` is unchanged. " +
+          contractNotificationDelivery("DEADLINE_REJECTED", "provider"),
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "integer" } },
         ],
-        responses: { "200": { description: "Deadline rejected" } },
+        responses: {
+          "200": {
+            description: "Deadline extension rejected",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    exchange: { $ref: "#/components/schemas/Exchange" },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
     "/api/v1/wallet/history": {
@@ -2770,7 +2853,12 @@ export const openApiSpec = {
         type: "object",
         required: ["proposedEndDate"],
         properties: {
-          proposedEndDate: { type: "string", format: "date-time" },
+          proposedEndDate: {
+            type: "string",
+            format: "date-time",
+            description: "Proposed new contract deadline. Must be strictly in the future.",
+            example: "2026-08-01T00:00:00.000Z",
+          },
         },
       },
       CreatePostRequest: {
@@ -3258,24 +3346,33 @@ export const openApiSpec = {
         type: "object",
         required: ["contractId"],
         properties: {
-          contractId: { type: "integer", description: "Service exchange (contract) ID" },
+          contractId: { type: "integer", description: "Service exchange (contract) ID", example: 42 },
           contractEndDate: {
             type: "string",
             format: "date-time",
             nullable: true,
-            description: "Agreed contract deadline (`maximum_end_date`)",
+            description: "Agreed contract deadline (`maximum_end_date`) at notification time",
+            example: "2026-07-01T00:00:00.000Z",
           },
           proposedEndDate: {
             type: "string",
             format: "date-time",
             nullable: true,
-            description: "Pending deadline extension proposed by the provider",
+            description: "Pending deadline extension proposed by the provider, if any",
+            example: null,
           },
           status: {
             type: "string",
             nullable: true,
             description: "Current contract status at notification time",
+            example: "IN_PROGRESS",
           },
+        },
+        example: {
+          contractId: 42,
+          contractEndDate: "2026-07-01T00:00:00.000Z",
+          proposedEndDate: null,
+          status: "IN_PROGRESS",
         },
       },
       NotificationMessageData: {
@@ -3300,7 +3397,24 @@ export const openApiSpec = {
       ContractNotificationNewEvent: {
         allOf: [{ $ref: "#/components/schemas/Notification" }],
         description:
-          "Socket.IO alias emitted on room `user:{userId}` for contract lifecycle notification types. Also emitted as `notification:new`.",
+          "Socket.IO alias emitted on room `user:{userId}` for contract lifecycle notification types " +
+          "(EXCHANGE_*, SESSION_*, DEADLINE_*, DEADLINE_APPROACHING, CONTRACT_AUTO_RESOLVED). " +
+          "Also emitted as `notification:new`. See `NotificationContractData` for the `data` payload shape.",
+        example: {
+          id: "clxyz123",
+          userId: 5,
+          type: "EXCHANGE_REQUESTED",
+          title: "طلب خدمة جديد",
+          body: "هناك شخص يطلب إحدى خدماتك. موعد انتهاء العقد: ١‏/٧‏/٢٠٢٦.",
+          data: {
+            contractId: 42,
+            contractEndDate: "2026-07-01T00:00:00.000Z",
+            proposedEndDate: null,
+            status: "PENDING",
+          },
+          isRead: false,
+          createdAt: "2026-06-27T12:00:00.000Z",
+        },
       },
       Notification: {
         type: "object",
@@ -3597,13 +3711,17 @@ export const openApiSpec = {
           contractEndDate: {
             type: "string",
             format: "date-time",
-            description: "Agreed contract deadline",
+            description:
+              "Agreed contract deadline (`maximum_end_date`). Set at creation; updated when a deadline extension is approved.",
+            example: "2026-07-01T00:00:00.000Z",
           },
           proposedEndDate: {
             type: "string",
             format: "date-time",
             nullable: true,
-            description: "Pending deadline extension proposed by the provider",
+            description:
+              "Pending deadline extension proposed by the provider. Cleared on approve or reject.",
+            example: null,
           },
           status: { $ref: "#/components/schemas/ExchangeStatus" },
           escrowStatus: { $ref: "#/components/schemas/EscrowStatus" },
