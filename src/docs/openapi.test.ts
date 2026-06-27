@@ -206,9 +206,46 @@ describe("OpenAPI spec", () => {
     assert.ok("ChatMessagesStatusEvent" in schemas);
     assert.ok("ChatPresenceOnlineEvent" in schemas);
     assert.ok("ChatPresenceOfflineEvent" in schemas);
+    assert.ok("NotificationType" in schemas);
+    assert.ok("NotificationNewEvent" in schemas);
+    assert.ok("NotificationContractData" in schemas);
 
     const sendSchema = schemas.SendMessageRequest;
     assert.ok(Array.isArray(sendSchema.required));
     assert.ok(sendSchema.required.includes("clientMessageId"));
+  });
+
+  it("documents notification types aligned with Prisma NotificationType enum", () => {
+    const notificationTypes = openApiSpec.components.schemas.NotificationType.enum;
+    assert.deepEqual(notificationTypes, [
+      "NEW_MESSAGE",
+      "CONVERSATION_STARTED",
+      "EXCHANGE_REQUESTED",
+      "EXCHANGE_ACCEPTED",
+      "EXCHANGE_REJECTED",
+      "EXCHANGE_CANCELED",
+      "SESSION_RECORDED",
+      "SESSION_CONFIRMED",
+      "SESSION_REJECTED",
+      "DEADLINE_PROPOSED",
+      "DEADLINE_APPROVED",
+      "DEADLINE_REJECTED",
+      "CONTRACT_AUTO_RESOLVED",
+    ]);
+  });
+
+  it("documents socket room names in Chat and Notifications tags", () => {
+    const chatTag = openApiSpec.tags.find((tag: { name?: string }) => tag.name === "Chat");
+    const notificationsTag = openApiSpec.tags.find(
+      (tag: { name?: string }) => tag.name === "Notifications",
+    );
+
+    assert.match(chatTag.description, /user:\{userId\}/);
+    assert.match(chatTag.description, /conversation:\{conversationId\}/);
+    assert.match(chatTag.description, /notification:new/);
+    assert.match(notificationsTag.description, /notification:new/);
+    assert.match(notificationsTag.description, /user:\{userId\}/);
+    assert.match(notificationsTag.description, /EXCHANGE_REQUESTED/);
+    assert.match(notificationsTag.description, /CONTRACT_AUTO_RESOLVED/);
   });
 });

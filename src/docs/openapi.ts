@@ -4,7 +4,7 @@ export const openApiSpec = {
     title: "Wasla Backend API",
     version: "1.0.0",
     description:
-      "API documentation for Wasla backend including auth, posts, skills, chat, notifications, and real-time messaging.",
+      "API documentation for Wasla backend including auth, posts, skills, chat, contract (exchange) lifecycle, notifications, and Socket.IO real-time events.",
   },
   servers: [
     {
@@ -38,8 +38,10 @@ export const openApiSpec = {
         "Status transitions are batched server-side (500ms debounce).\n\n" +
         "**Idempotent sends:** `POST /conversations/{conversationId}/messages` requires `clientMessageId` (UUID). " +
         "Retrying the same UUID returns HTTP 200 with the existing message (no duplicate row).\n\n" +
-        "**Socket.IO connection:** pass access JWT in `auth.token`. Engine heartbeat: ping every 10s, disconnect if no pong within 5s. " +
-        "Personal room `user:{userId}` is auto-joined; join `conversation:{conversationId}` via `chat:join`.\n\n" +
+        "**Socket.IO connection:** pass access JWT in `auth.token`. Engine heartbeat: ping every 10s, disconnect if no pong within 5s.\n\n" +
+        "**Socket rooms (channels):**\n" +
+        "- `user:{userId}` — auto-joined on connect; receives `notification:new` (all in-app notifications) and `chat:notification:new` (deprecated alias for chat only)\n" +
+        "- `conversation:{conversationId}` — join via client event `chat:join`; receives chat message and presence events for that conversation\n\n" +
         "**Client → server events:** `chat:join`, `chat:leave`, `chat:messages:delivered`, `chat:messages:read` " +
         "(see `ChatMessagesDeliveredPayload`, `ChatMessagesReadPayload`).\n\n" +
         "**Server → client events:** `chat:message:new`, `chat:message:sent`, `chat:message:edited`, `chat:message:deleted`, " +
@@ -50,8 +52,28 @@ export const openApiSpec = {
     {
       name: "Notifications",
       description:
-        "In-app notifications for chat and platform events. New notifications are pushed in real time via Socket.IO " +
-        "(`notification:new` on personal room `user:{userId}`). Use REST for inbox history, pagination, and mark-as-read.",
+        "In-app notifications for chat messages and contract lifecycle events. No email is sent for contract notifications.\n\n" +
+        "**Real-time delivery:** server emits Socket.IO event `notification:new` on personal room `user:{userId}` (auto-joined on connect). " +
+        "For `NEW_MESSAGE` only, a deprecated alias `chat:notification:new` is also emitted on the same room.\n\n" +
+        "**REST inbox:** `GET /notifications` for history/pagination; `PATCH /notifications/:id/read` and `PATCH /notifications/read-all` for read state. " +
+        "Call REST on app load and after reconnect to reconcile missed socket events.\n\n" +
+        "**Contract notification types** (payload `data`: `{ contractId: number }`):\n\n" +
+        "| Operation | Type | Recipient |\n" +
+        "|-----------|------|----------|\n" +
+        "| `POST /exchanges/request` | `EXCHANGE_REQUESTED` | Provider |\n" +
+        "| `PUT /exchanges/{id}/accept` | `EXCHANGE_ACCEPTED` | Requester |\n" +
+        "| `PUT /exchanges/{id}/reject` | `EXCHANGE_REJECTED` | Requester |\n" +
+        "| `PUT /exchanges/{id}/cancel` | `EXCHANGE_CANCELED` | Other party |\n" +
+        "| `POST /exchanges/{id}/sessions` | `SESSION_RECORDED` | Requester |\n" +
+        "| `PUT /exchanges/{id}/sessions/{sessionId}/confirm` | `SESSION_CONFIRMED` | Provider |\n" +
+        "| `PUT /exchanges/{id}/sessions/{sessionId}/reject` | `SESSION_REJECTED` | Provider |\n" +
+        "| `POST /exchanges/{id}/deadline` | `DEADLINE_PROPOSED` | Requester |\n" +
+        "| `PUT /exchanges/{id}/deadline/approve` | `DEADLINE_APPROVED` | Provider |\n" +
+        "| `PUT /exchanges/{id}/deadline/reject` | `DEADLINE_REJECTED` | Provider |\n" +
+        "| Cron auto-resolve (hourly) | `CONTRACT_AUTO_RESOLVED` | Both parties |\n\n" +
+        "**Chat notification types** (payload `data`: `{ conversationId, messageId, postId? }`):\n" +
+        "`NEW_MESSAGE` (also `chat:notification:new`). `CONVERSATION_STARTED` is reserved for future use.\n\n" +
+        "Notification persistence failures are logged but never block the triggering HTTP action.",
     },
     {
       name: "Profile",
@@ -68,7 +90,9 @@ export const openApiSpec = {
     {
       name: "Exchanges",
       description:
-        "Time-credit service exchange (contract) lifecycle with escrow: request, accept, reject, deliver, confirm, cancel, and dispute",
+        "Time-credit service exchange (contract) lifecycle with escrow: request, accept, reject, deliver, confirm, cancel, dispute, work sessions, and deadline extensions. " +
+        "Most state transitions push an in-app notification via Socket.IO `notification:new` on room `user:{userId}` (see Notifications tag). " +
+        "No notification is sent for deliver, whole-contract confirm, or dispute. Expired active contracts are auto-resolved hourly (cron) with `CONTRACT_AUTO_RESOLVED` sent to both parties.",
     },
     {
       name: "Wallet",
@@ -1232,8 +1256,9 @@ export const openApiSpec = {
         tags: ["Notifications"],
         summary: "List notifications",
         description:
-          "Paginated inbox history. For real-time delivery, listen for Socket.IO `notification:new` on room `user:{userId}` " +
-          "(auto-joined on connect). Call this endpoint on app load, pull-to-refresh, and after reconnect to reconcile missed events.",
+          "Paginated inbox history. For real-time delivery, listen for Socket.IO event `notification:new` on room `user:{userId}` " +
+          "(auto-joined on connect). Call this endpoint on app load, pull-to-refresh, and after reconnect to reconcile missed events. " +
+          "Contract notifications include `data.contractId`; chat notifications include `data.conversationId` and `data.messageId`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "cursor", in: "query", schema: { type: "string" } },
@@ -1631,7 +1656,8 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Request a service exchange (create contract)",
         description:
-          "Creates a PENDING contract. No time credits are deducted at this stage. The requester is the authenticated user; you cannot request a service from yourself, and you must currently hold at least `duration` available credits.",
+          "Creates a PENDING contract. No time credits are deducted at this stage. The requester is the authenticated user; you cannot request a service from yourself, and you must currently hold at least `duration` available credits. " +
+          "Pushes `EXCHANGE_REQUESTED` to the provider via Socket.IO `notification:new` on room `user:{userId}`.",
         security: [{ bearerAuth: [] }],
         requestBody: {
           required: true,
@@ -1754,7 +1780,8 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Accept a contract (provider only)",
         description:
-          "Provider-only. The contract must be PENDING. Runs in a serializable transaction: re-checks the requester's available credits, then deducts `duration` from available and moves it into escrow (HELD). Fails if the requester no longer has enough credits.",
+          "Provider-only. The contract must be PENDING. Runs in a serializable transaction: re-checks the requester's available credits, then deducts `duration` from available and moves it into escrow (HELD). Fails if the requester no longer has enough credits. " +
+          "Pushes `EXCHANGE_ACCEPTED` to the requester via Socket.IO `notification:new` on room `user:{userId}`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1798,7 +1825,9 @@ export const openApiSpec = {
       put: {
         tags: ["Exchanges"],
         summary: "Reject a contract (provider only)",
-        description: "Provider-only. The contract must be PENDING. No credit changes.",
+        description:
+          "Provider-only. The contract must be PENDING. No credit changes. " +
+          "Pushes `EXCHANGE_REJECTED` to the requester via Socket.IO `notification:new` on room `user:{userId}`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1835,7 +1864,7 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Mark a contract as delivered (provider only)",
         description:
-          "Provider-only. The contract must be IN_PROGRESS. Moves it to WAITING_CONFIRMATION. Credits remain frozen in escrow.",
+          "Provider-only. The contract must be IN_PROGRESS. Moves it to WAITING_CONFIRMATION. Credits remain frozen in escrow. No notification is sent.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1872,7 +1901,7 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Confirm delivery (requester only)",
         description:
-          "Requester-only. The contract must be WAITING_CONFIRMATION. Runs in a serializable transaction: releases escrow from the requester, credits the provider, increments both users' service stats, writes a TRANSFER ledger entry, and sets the contract to COMPLETED / escrow RELEASED.",
+          "Requester-only. The contract must be WAITING_CONFIRMATION. Runs in a serializable transaction: releases escrow from the requester, credits the provider, increments both users' service stats, writes a TRANSFER ledger entry, and sets the contract to COMPLETED / escrow RELEASED. No notification is sent.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1910,7 +1939,8 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Cancel a contract",
         description:
-          "If PENDING: either participant may cancel (no credit changes), moving it to CANCELED. If IN_PROGRESS or WAITING_CONFIRMATION: a provider cancel refunds the escrow to the requester (CANCELED / REFUNDED), while a requester cancel cannot unilaterally close it and instead escalates to DISPUTED with credits left frozen.",
+          "If PENDING: either participant may cancel (no credit changes), moving it to CANCELED. If IN_PROGRESS or WAITING_CONFIRMATION: a provider cancel refunds the escrow to the requester (CANCELED / REFUNDED), while a requester cancel cannot unilaterally close it and instead escalates to DISPUTED with credits left frozen. " +
+          "When status becomes CANCELED, pushes `EXCHANGE_CANCELED` to the other party via Socket.IO `notification:new` on room `user:{userId}`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -1955,7 +1985,7 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Open a dispute on a contract",
         description:
-          "Participant-only. The contract must be IN_PROGRESS or WAITING_CONFIRMATION. Moves it to DISPUTED; credits remain frozen in escrow until an admin resolves it.",
+          "Participant-only. The contract must be IN_PROGRESS or WAITING_CONFIRMATION. Moves it to DISPUTED; credits remain frozen in escrow until an admin resolves it. No notification is sent.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -2022,7 +2052,8 @@ export const openApiSpec = {
       post: {
         tags: ["Exchanges"],
         summary: "Log a new work session",
-        description: "Provider only. Logs hours worked.",
+        description:
+          "Provider only. Logs hours worked. Pushes `SESSION_RECORDED` to the requester via Socket.IO `notification:new` on room `user:{userId}`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
@@ -2061,7 +2092,8 @@ export const openApiSpec = {
       put: {
         tags: ["Exchanges"],
         summary: "Confirm a work session",
-        description: "Requester only. Approves logged hours.",
+        description:
+          "Requester only. Approves logged hours. Pushes `SESSION_CONFIRMED` to the provider via Socket.IO `notification:new` on room `user:{userId}`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "integer" } },
@@ -2074,7 +2106,8 @@ export const openApiSpec = {
       put: {
         tags: ["Exchanges"],
         summary: "Reject a work session",
-        description: "Requester only.",
+        description:
+          "Requester only. Pushes `SESSION_REJECTED` to the provider via Socket.IO `notification:new` on room `user:{userId}`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "integer" } },
@@ -2087,6 +2120,9 @@ export const openApiSpec = {
       post: {
         tags: ["Exchanges"],
         summary: "Propose a new deadline",
+        description:
+          "Provider only. Contract must be IN_PROGRESS or WAITING_CONFIRMATION. " +
+          "Pushes `DEADLINE_PROPOSED` to the requester via Socket.IO `notification:new` on room `user:{userId}`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "integer" } },
@@ -2106,6 +2142,9 @@ export const openApiSpec = {
       put: {
         tags: ["Exchanges"],
         summary: "Approve a proposed deadline",
+        description:
+          "Requester only. Requires a pending `proposedEndDate`. " +
+          "Pushes `DEADLINE_APPROVED` to the provider via Socket.IO `notification:new` on room `user:{userId}`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "integer" } },
@@ -2117,6 +2156,9 @@ export const openApiSpec = {
       put: {
         tags: ["Exchanges"],
         summary: "Reject a proposed deadline",
+        description:
+          "Requester only. Requires a pending `proposedEndDate`. " +
+          "Pushes `DEADLINE_REJECTED` to the provider via Socket.IO `notification:new` on room `user:{userId}`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "integer" } },
@@ -3041,7 +3083,7 @@ export const openApiSpec = {
         properties: {
           conversationId: { type: "string" },
         },
-        description: "Socket.IO client event `chat:join` — join room conversation:{conversationId}.",
+        description: "Socket.IO client event `chat:join` — join room `conversation:{conversationId}`.",
       },
       ChatSocketLeavePayload: {
         type: "object",
@@ -3049,7 +3091,7 @@ export const openApiSpec = {
         properties: {
           conversationId: { type: "string" },
         },
-        description: "Socket.IO client event `chat:leave`.",
+        description: "Socket.IO client event `chat:leave` — leave room `conversation:{conversationId}`.",
       },
       ChatMessagesDeliveredPayload: {
         type: "object",
@@ -3190,15 +3232,66 @@ export const openApiSpec = {
           nextCursor: { type: "string", nullable: true },
         },
       },
+      NotificationType: {
+        type: "string",
+        enum: [
+          "NEW_MESSAGE",
+          "CONVERSATION_STARTED",
+          "EXCHANGE_REQUESTED",
+          "EXCHANGE_ACCEPTED",
+          "EXCHANGE_REJECTED",
+          "EXCHANGE_CANCELED",
+          "SESSION_RECORDED",
+          "SESSION_CONFIRMED",
+          "SESSION_REJECTED",
+          "DEADLINE_PROPOSED",
+          "DEADLINE_APPROVED",
+          "DEADLINE_REJECTED",
+          "CONTRACT_AUTO_RESOLVED",
+        ],
+        description: "In-app notification category aligned with the Prisma `NotificationType` enum.",
+      },
+      NotificationContractData: {
+        type: "object",
+        required: ["contractId"],
+        properties: {
+          contractId: { type: "integer", description: "Service exchange (contract) ID" },
+        },
+      },
+      NotificationMessageData: {
+        type: "object",
+        required: ["conversationId", "messageId"],
+        properties: {
+          conversationId: { type: "string" },
+          messageId: { type: "string" },
+          postId: { type: "integer", nullable: true },
+        },
+      },
+      NotificationNewEvent: {
+        allOf: [{ $ref: "#/components/schemas/Notification" }],
+        description:
+          "Socket.IO server event `notification:new` — emitted on personal room `user:{userId}` for every persisted notification.",
+      },
+      ChatNotificationNewEvent: {
+        allOf: [{ $ref: "#/components/schemas/Notification" }],
+        description:
+          "Deprecated Socket.IO alias emitted on room `user:{userId}` when `type` is `NEW_MESSAGE` only. Prefer `notification:new`.",
+      },
       Notification: {
         type: "object",
         properties: {
           id: { type: "string" },
           userId: { type: "integer" },
-          type: { type: "string", enum: ["NEW_MESSAGE", "CONVERSATION_STARTED"] },
+          type: { $ref: "#/components/schemas/NotificationType" },
           title: { type: "string" },
           body: { type: "string" },
-          data: { type: "object", nullable: true, additionalProperties: true },
+          data: {
+            oneOf: [
+              { $ref: "#/components/schemas/NotificationMessageData" },
+              { $ref: "#/components/schemas/NotificationContractData" },
+            ],
+            nullable: true,
+          },
           isRead: { type: "boolean" },
           createdAt: { type: "string", format: "date-time" },
         },
