@@ -8,7 +8,9 @@ import { createContractNotification, logContractNotificationFailure } from "../n
 import {
   buildDeadlineResolutionPlan,
   deadlineResolutionNotificationCopy,
+  type ResolutionPlan,
 } from "./contract-resolution.js";
+import type { ServiceExchange } from "../../generated/prisma/client.js";
 import { ExchangeError } from "./exchanges.errors.js";
 import type { CreateExchangeInput, ListExchangesQuery, CreateSessionInput, DeadlineExtensionInput } from "./exchanges.schema.js";
 
@@ -183,6 +185,10 @@ const runSerializable = async <T>(
 
   throw lastError;
 };
+
+type ExpiredContractResolutionResult =
+  | { resolved: false }
+  | { resolved: true; plan: ResolutionPlan; contract: ServiceExchange };
 
 const findExchangeOrThrow = async (id: number) => {
   const exchange = await prisma.serviceExchange.findUnique({
@@ -1076,7 +1082,7 @@ export const resolveExpiredContracts = async () => {
 
   for (const contract of expiredContracts) {
     try {
-      const result = await runSerializable(async (tx) => {
+      const result = await runSerializable<ExpiredContractResolutionResult>(async (tx) => {
         const currentContract = await tx.serviceExchange.findUnique({
           where: { id: contract.id },
         });
