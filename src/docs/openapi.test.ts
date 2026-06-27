@@ -238,6 +238,9 @@ describe("OpenAPI spec", () => {
       "DEADLINE_REJECTED",
       "DEADLINE_APPROACHING",
       "CONTRACT_AUTO_RESOLVED",
+      "CONTRACT_AUTO_COMPLETED",
+      "CONTRACT_AUTO_DISPUTED",
+      "CONTRACT_RESOLUTION_FAILED",
     ]);
   });
 
@@ -253,7 +256,8 @@ describe("OpenAPI spec", () => {
     assert.match(notificationsTag.description, /notification:new/);
     assert.match(notificationsTag.description, /user:\{userId\}/);
     assert.match(notificationsTag.description, /EXCHANGE_REQUESTED/);
-    assert.match(notificationsTag.description, /CONTRACT_AUTO_RESOLVED/);
+    assert.match(notificationsTag.description, /CONTRACT_AUTO_COMPLETED/);
+    assert.match(notificationsTag.description, /CONTRACT_AUTO_DISPUTED/);
     assert.match(notificationsTag.description, /contract:notification:new/);
     assert.match(notificationsTag.description, /DEADLINE_APPROACHING/);
     assert.match(notificationsTag.description, /maximum_end_date/);

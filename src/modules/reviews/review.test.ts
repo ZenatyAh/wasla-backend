@@ -95,6 +95,7 @@ if (!hasTestDatabase) {
           consumer_id: consumerId,
           time_credits: 2,
           status: "COMPLETED",
+          maximum_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
           completed_at: new Date(),
         },
       });
@@ -201,6 +202,74 @@ if (!hasTestDatabase) {
         .set(authHeader(consumerToken));
 
       assert.equal(response.status, 404);
+    });
+
+    it("allows review on auto-resolved DISPUTED contract with settled escrow", async () => {
+      const disputedExchange = await prisma.serviceExchange.create({
+        data: {
+          post_id: postId,
+          provider_id: providerId,
+          consumer_id: consumerId,
+          time_credits: 3,
+          status: "DISPUTED",
+          escrow_status: "RELEASED",
+          maximum_end_date: new Date(Date.now() - 60_000),
+          completed_at: new Date(),
+          resolution_fault_party: "SEEKER",
+        },
+      });
+
+      try {
+        const response = await request(app)
+          .post("/reviews")
+          .set(authHeader(providerToken))
+          .send({
+            serviceExchangeId: disputedExchange.id,
+            rating: 4,
+            comment: "Partial delivery review",
+          });
+
+        assert.equal(response.status, 201);
+        assert.equal(response.body.review.rating, 4);
+      } finally {
+        await prisma.review.deleteMany({
+          where: { service_exchange_id: disputedExchange.id },
+        });
+        await prisma.serviceExchange.delete({
+          where: { id: disputedExchange.id },
+        });
+      }
+    });
+
+    it("rejects review on manual DISPUTED contract with frozen escrow", async () => {
+      const frozenDispute = await prisma.serviceExchange.create({
+        data: {
+          post_id: postId,
+          provider_id: providerId,
+          consumer_id: consumerId,
+          time_credits: 3,
+          status: "DISPUTED",
+          escrow_status: "HELD",
+          maximum_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      try {
+        const response = await request(app)
+          .post("/reviews")
+          .set(authHeader(providerToken))
+          .send({
+            serviceExchangeId: frozenDispute.id,
+            rating: 4,
+            comment: "Should not be allowed",
+          });
+
+        assert.equal(response.status, 400);
+      } finally {
+        await prisma.serviceExchange.delete({
+          where: { id: frozenDispute.id },
+        });
+      }
     });
   });
 }

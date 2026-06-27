@@ -5,6 +5,10 @@ import {
   type PostForMapping,
 } from "../recommender/recommender.mapper.js";
 import { createContractNotification, logContractNotificationFailure } from "../notifications/notification.service.js";
+import {
+  buildDeadlineResolutionPlan,
+  deadlineResolutionNotificationCopy,
+} from "./contract-resolution.js";
 import { ExchangeError } from "./exchanges.errors.js";
 import type { CreateExchangeInput, ListExchangesQuery, CreateSessionInput, DeadlineExtensionInput } from "./exchanges.schema.js";
 
@@ -1061,7 +1065,6 @@ export const notifyApproachingDeadlines = async () => {
 export const resolveExpiredContracts = async () => {
   const now = new Date();
 
-  // Find active contracts that have passed their maximum_end_date
   const expiredContracts = await prisma.serviceExchange.findMany({
     where: {
       status: { in: ["IN_PROGRESS", "WAITING_CONFIRMATION"] },
@@ -1073,94 +1076,163 @@ export const resolveExpiredContracts = async () => {
 
   for (const contract of expiredContracts) {
     try {
-      await runSerializable(async (tx) => {
-        // Re-fetch with a lock
+      const result = await runSerializable(async (tx) => {
         const currentContract = await tx.serviceExchange.findUnique({
           where: { id: contract.id },
         });
 
         if (
           !currentContract ||
-          (currentContract.status !== "IN_PROGRESS" && currentContract.status !== "WAITING_CONFIRMATION") ||
+          (currentContract.status !== "IN_PROGRESS" &&
+            currentContract.status !== "WAITING_CONFIRMATION") ||
           currentContract.maximum_end_date > now
         ) {
-          return; // State changed, skip
+          return { resolved: false as const };
         }
 
-        const providerCredits = currentContract.completed_hours;
-        const refundCredits = currentContract.time_credits - providerCredits;
+        const lastSession = await tx.workSession.findFirst({
+          where: { contract_id: currentContract.id },
+          orderBy: { session_number: "desc" },
+          select: { status: true },
+        });
 
-        // Perform transfers
-        if (providerCredits > 0) {
+        const plan = buildDeadlineResolutionPlan({
+          timeCredits: currentContract.time_credits,
+          completedHours: currentContract.completed_hours,
+          lastSession,
+        });
+
+        const released = await tx.user.updateMany({
+          where: {
+            id: currentContract.consumer_id,
+            escrow_balance: { gte: currentContract.time_credits },
+          },
+          data: {
+            escrow_balance: { decrement: currentContract.time_credits },
+            ...(plan.providerCredits > 0
+              ? { services_received: { increment: 1 } }
+              : {}),
+          },
+        });
+        if (released.count === 0) {
+          throw new ExchangeError(
+            "Escrowed credits are not available for auto-resolution",
+            400,
+          );
+        }
+
+        if (plan.providerCredits > 0) {
           await tx.user.update({
             where: { id: currentContract.provider_id },
-            data: { available_balance: { increment: providerCredits } },
+            data: {
+              available_balance: { increment: plan.providerCredits },
+              services_provided: { increment: 1 },
+            },
           });
 
           await tx.transaction.create({
             data: {
               sender_id: currentContract.consumer_id,
               receiver_id: currentContract.provider_id,
-              amount: providerCredits,
+              amount: plan.providerCredits,
               transaction_type: "TRANSFER",
+              reference_contract_id: currentContract.id,
             },
           });
         }
 
-        if (refundCredits > 0) {
+        if (plan.refundCredits > 0) {
           await tx.user.update({
             where: { id: currentContract.consumer_id },
-            data: { available_balance: { increment: refundCredits } },
+            data: { available_balance: { increment: plan.refundCredits } },
           });
 
           await tx.transaction.create({
             data: {
               sender_id: currentContract.consumer_id,
               receiver_id: currentContract.consumer_id,
-              amount: refundCredits,
+              amount: plan.refundCredits,
               transaction_type: "REFUND",
+              reference_contract_id: currentContract.id,
             },
           });
         }
 
-        // Complete the contract
         await tx.serviceExchange.update({
           where: { id: currentContract.id },
           data: {
-            status: "COMPLETED",
-            escrow_status: "RELEASED",
+            status: plan.status,
+            escrow_status: plan.escrowStatus,
             completed_at: now,
+            resolution_fault_party: plan.fault,
           },
         });
+
+        return { resolved: true as const, plan, contract: currentContract };
+      });
+
+      if (!result.resolved) {
+        continue;
+      }
+
+      const { plan, contract: resolvedContract } = result;
+      const copy = deadlineResolutionNotificationCopy(plan);
+      const resolutionMeta = {
+        fault: plan.fault,
+        providerCredits: plan.providerCredits,
+        refundCredits: plan.refundCredits,
+      };
+
+      await notifyContract({
+        recipientId: resolvedContract.provider_id,
+        type: plan.notificationType,
+        title: copy.title,
+        body: copy.body,
+        contractId: resolvedContract.id,
+        ...contractNotificationMeta({
+          ...resolvedContract,
+          status: plan.status,
+        }),
+        ...resolutionMeta,
       });
 
       await notifyContract({
-        recipientId: contract.provider_id,
-        type: "CONTRACT_AUTO_RESOLVED",
-        title: "تم إنهاء العقد تلقائياً",
-        body: "تم إنهاء العقد تلقائياً لانتهاء المدة المتفق عليها.",
-        contractId: contract.id,
+        recipientId: resolvedContract.consumer_id,
+        type: plan.notificationType,
+        title: copy.title,
+        body: copy.body,
+        contractId: resolvedContract.id,
         ...contractNotificationMeta({
-          ...contract,
-          status: "COMPLETED",
+          ...resolvedContract,
+          status: plan.status,
         }),
-      });
-
-      await notifyContract({
-        recipientId: contract.consumer_id,
-        type: "CONTRACT_AUTO_RESOLVED",
-        title: "تم إنهاء العقد تلقائياً",
-        body: "تم إنهاء العقد تلقائياً لانتهاء المدة المتفق عليها.",
-        contractId: contract.id,
-        ...contractNotificationMeta({
-          ...contract,
-          status: "COMPLETED",
-        }),
+        ...resolutionMeta,
       });
 
       resolvedCount++;
     } catch (error) {
-      console.error(`Failed to resolve expired contract ${contract.id}:`, error);
+      console.error(
+        `Failed to resolve expired contract ${contract.id}:`,
+        error,
+      );
+
+      await notifyContract({
+        recipientId: contract.provider_id,
+        type: "CONTRACT_RESOLUTION_FAILED",
+        title: "تعذر إنهاء العقد تلقائياً",
+        body: "حدث خطأ أثناء إنهاء العقد تلقائياً. يرجى التواصل مع الدعم.",
+        contractId: contract.id,
+        ...contractNotificationMeta(contract),
+      });
+
+      await notifyContract({
+        recipientId: contract.consumer_id,
+        type: "CONTRACT_RESOLUTION_FAILED",
+        title: "تعذر إنهاء العقد تلقائياً",
+        body: "حدث خطأ أثناء إنهاء العقد تلقائياً. يرجى التواصل مع الدعم.",
+        contractId: contract.id,
+        ...contractNotificationMeta(contract),
+      });
     }
   }
 

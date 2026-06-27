@@ -3,7 +3,7 @@ const contractNotificationDelivery = (
   recipient: string,
 ) =>
   `Pushes \`${type}\` to the ${recipient} via Socket.IO \`notification:new\` and \`contract:notification:new\` on room \`user:{userId}\`. ` +
-  "Notification `data` includes `contractId`, `contractEndDate`, `proposedEndDate`, and `status`.";
+  "Notification `data` includes `contractId`, `contractEndDate`, `proposedEndDate`, `status`, and for auto-resolution outcomes optionally `fault`, `providerCredits`, and `refundCredits`.";
 
 const contractDeadlineWorkflow =
   "**Contract deadline (`maximum_end_date`):** the requester sets it at creation as `contractEndDate` (legacy alias `maximumEndDate`). " +
@@ -11,7 +11,7 @@ const contractDeadlineWorkflow =
   "Only the provider may propose an extension; only the requester may approve or reject it. " +
   "On approval, `contractEndDate` is updated and any prior deadline reminder is reset. " +
   "Hourly cron sends `DEADLINE_APPROACHING` to both parties when less than 24 hours remain (once per deadline). " +
-  "Every 15 minutes, cron auto-resolves active contracts past `contractEndDate` (`CONTRACT_AUTO_RESOLVED`, credits split by completed hours).";
+  "Every 15 minutes, cron auto-resolves active contracts past `contractEndDate`: full completion emits `CONTRACT_AUTO_COMPLETED`; partial completion uses last-session fault rules and emits `CONTRACT_AUTO_DISPUTED`; failures emit `CONTRACT_RESOLUTION_FAILED`.";
 
 export const openApiSpec = {
   openapi: "3.0.3",
@@ -74,7 +74,7 @@ export const openApiSpec = {
         "**REST inbox:** `GET /notifications` for history/pagination; `PATCH /notifications/:id/read` and `PATCH /notifications/read-all` for read state. " +
         "Call REST on app load and after reconnect to reconcile missed socket events.\n\n" +
         contractDeadlineWorkflow +
-        "\n\n**Contract notification types** (payload `data`: `{ contractId, contractEndDate, proposedEndDate, status }`):\n\n" +
+        "\n\n**Contract notification types** (payload `data`: `{ contractId, contractEndDate, proposedEndDate, status, fault?, providerCredits?, refundCredits? }`):\n\n" +
         "| Operation | Type | Recipient |\n" +
         "|-----------|------|----------|\n" +
         "| `POST /exchanges/request` | `EXCHANGE_REQUESTED` | Provider |\n" +
@@ -88,7 +88,7 @@ export const openApiSpec = {
         "| `PUT /exchanges/{id}/deadline/approve` | `DEADLINE_APPROVED` | Provider |\n" +
         "| `PUT /exchanges/{id}/deadline/reject` | `DEADLINE_REJECTED` | Provider |\n" +
         "| Cron approaching deadline (hourly) | `DEADLINE_APPROACHING` | Both parties |\n" +
-        "| Cron auto-resolve (every 15 min) | `CONTRACT_AUTO_RESOLVED` | Both parties |\n\n" +
+        "| Cron auto-resolve (every 15 min) | `CONTRACT_AUTO_COMPLETED`, `CONTRACT_AUTO_DISPUTED`, or `CONTRACT_RESOLUTION_FAILED` | Both parties |\n\n" +
         "**Chat notification types** (payload `data`: `{ conversationId, messageId, postId? }`):\n" +
         "`NEW_MESSAGE` (also `chat:notification:new`). `CONVERSATION_STARTED` is reserved for future use.\n\n" +
         "Notification persistence failures are logged but never block the triggering HTTP action.",
@@ -3339,6 +3339,9 @@ export const openApiSpec = {
           "DEADLINE_REJECTED",
           "DEADLINE_APPROACHING",
           "CONTRACT_AUTO_RESOLVED",
+          "CONTRACT_AUTO_COMPLETED",
+          "CONTRACT_AUTO_DISPUTED",
+          "CONTRACT_RESOLUTION_FAILED",
         ],
         description: "In-app notification category aligned with the Prisma `NotificationType` enum.",
       },
@@ -3366,6 +3369,24 @@ export const openApiSpec = {
             nullable: true,
             description: "Current contract status at notification time",
             example: "IN_PROGRESS",
+          },
+          fault: {
+            type: "string",
+            nullable: true,
+            description: "Fault party for auto-resolved contracts (NONE, SEEKER, PROVIDER)",
+            example: "SEEKER",
+          },
+          providerCredits: {
+            type: "integer",
+            nullable: true,
+            description: "Credits transferred to the provider on auto-resolution",
+            example: 2,
+          },
+          refundCredits: {
+            type: "integer",
+            nullable: true,
+            description: "Credits refunded to the requester on auto-resolution",
+            example: 3,
           },
         },
         example: {
@@ -3398,7 +3419,7 @@ export const openApiSpec = {
         allOf: [{ $ref: "#/components/schemas/Notification" }],
         description:
           "Socket.IO alias emitted on room `user:{userId}` for contract lifecycle notification types " +
-          "(EXCHANGE_*, SESSION_*, DEADLINE_*, DEADLINE_APPROACHING, CONTRACT_AUTO_RESOLVED). " +
+          "(EXCHANGE_*, SESSION_*, DEADLINE_*, DEADLINE_APPROACHING, CONTRACT_AUTO_*). " +
           "Also emitted as `notification:new`. See `NotificationContractData` for the `data` payload shape.",
         example: {
           id: "clxyz123",

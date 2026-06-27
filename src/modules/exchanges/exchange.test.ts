@@ -20,6 +20,7 @@ if (!hasTestDatabase) {
   const { signAccessToken } = await import("../../common/utils/jwt.js");
   const { prisma } = await import("../../lib/prisma.js");
   const { default: app } = await import("../../server.js");
+  const { resolveExpiredContracts } = await import("./exchanges.service.js");
 
   const runId = `exch_${Date.now()}`;
   const password = "TestPass@123";
@@ -638,6 +639,184 @@ if (!hasTestDatabase) {
           .set(authHeader(requester.token));
         assert.equal(response.status, 200);
         assert.equal(response.body.exchange.id, exchangeId);
+      });
+    });
+
+    // ---------------------------------------------------------------------
+    // 7. Deadline auto-resolution (UC-TX-07)
+    // ---------------------------------------------------------------------
+    describe("Deadline auto-resolution (UC-TX-07)", () => {
+      const pastDeadline = () => new Date(Date.now() - 60_000);
+
+      const acceptAndExpire = async (
+        requester: Actor,
+        provider: Actor,
+        duration: number,
+        options: {
+          completedHours?: number;
+          sessions?: Array<{ hours: number; status: "PENDING_CONFIRMATION" | "CONFIRMED" | "REJECTED" }>;
+        } = {},
+      ) => {
+        const postId = await createServicePost(provider.id);
+        const created = await createPendingExchange(
+          requester,
+          provider.id,
+          postId,
+          duration,
+        );
+        assert.equal(created.status, 201);
+        const exchangeId = created.body.exchange.id;
+
+        await request(app)
+          .put(`/exchanges/${exchangeId}/accept`)
+          .set(authHeader(provider.token));
+
+        if (options.sessions?.length) {
+          let sessionNumber = 0;
+          for (const session of options.sessions) {
+            sessionNumber += 1;
+            await prisma.workSession.create({
+              data: {
+                contract_id: exchangeId,
+                session_number: sessionNumber,
+                hours: session.hours,
+                status: session.status,
+                ...(session.status === "CONFIRMED"
+                  ? { confirmed_at: new Date() }
+                  : {}),
+              },
+            });
+          }
+        }
+
+        await prisma.serviceExchange.update({
+          where: { id: exchangeId },
+          data: {
+            maximum_end_date: pastDeadline(),
+            completed_hours: options.completedHours ?? 0,
+          },
+        });
+
+        return exchangeId;
+      };
+
+      it("Alt 1: full confirmed hours → COMPLETED with correct escrow settlement", async () => {
+        const requester = await createActor("uc07_alt1_req", 10);
+        const provider = await createActor("uc07_alt1_prov", 5);
+        const exchangeId = await acceptAndExpire(requester, provider, 5, {
+          completedHours: 5,
+          sessions: [{ hours: 5, status: "CONFIRMED" }],
+        });
+
+        const requesterBefore = await getBalances(requester.id);
+        const providerBefore = await getBalances(provider.id);
+
+        const count = await resolveExpiredContracts();
+        assert.equal(count, 1);
+
+        const exchange = await prisma.serviceExchange.findUniqueOrThrow({
+          where: { id: exchangeId },
+        });
+        assert.equal(exchange.status, "COMPLETED");
+        assert.equal(exchange.escrow_status, "RELEASED");
+        assert.equal(exchange.resolution_fault_party, "NONE");
+
+        const requesterAfter = await getBalances(requester.id);
+        const providerAfter = await getBalances(provider.id);
+        assert.equal(requesterAfter.escrow_balance, 0);
+        assert.equal(requesterAfter.available_balance, requesterBefore.available_balance);
+        assert.equal(providerAfter.available_balance, providerBefore.available_balance + 5);
+        assert.equal(providerAfter.services_provided, providerBefore.services_provided + 1);
+      });
+
+      it("Alt 2 seeker fault: pending last session → DISPUTED partial settlement", async () => {
+        const requester = await createActor("uc07_seeker_req", 10);
+        const provider = await createActor("uc07_seeker_prov", 5);
+        const exchangeId = await acceptAndExpire(requester, provider, 5, {
+          completedHours: 2,
+          sessions: [
+            { hours: 2, status: "CONFIRMED" },
+            { hours: 3, status: "PENDING_CONFIRMATION" },
+          ],
+        });
+
+        const providerBefore = await getBalances(provider.id);
+        const requesterBefore = await getBalances(requester.id);
+
+        await resolveExpiredContracts();
+
+        const exchange = await prisma.serviceExchange.findUniqueOrThrow({
+          where: { id: exchangeId },
+        });
+        assert.equal(exchange.status, "DISPUTED");
+        assert.equal(exchange.escrow_status, "RELEASED");
+        assert.equal(exchange.resolution_fault_party, "SEEKER");
+
+        const requesterAfter = await getBalances(requester.id);
+        const providerAfter = await getBalances(provider.id);
+        assert.equal(requesterAfter.escrow_balance, 0);
+        assert.equal(requesterAfter.available_balance, requesterBefore.available_balance + 3);
+        assert.equal(providerAfter.available_balance, providerBefore.available_balance + 2);
+      });
+
+      it("Alt 2 provider fault: no sessions → full refund", async () => {
+        const requester = await createActor("uc07_prov_req", 10);
+        const provider = await createActor("uc07_prov_prov", 5);
+        const exchangeId = await acceptAndExpire(requester, provider, 5);
+
+        const requesterBefore = await getBalances(requester.id);
+        const providerBefore = await getBalances(provider.id);
+
+        await resolveExpiredContracts();
+
+        const exchange = await prisma.serviceExchange.findUniqueOrThrow({
+          where: { id: exchangeId },
+        });
+        assert.equal(exchange.status, "DISPUTED");
+        assert.equal(exchange.escrow_status, "REFUNDED");
+        assert.equal(exchange.resolution_fault_party, "PROVIDER");
+
+        const requesterAfter = await getBalances(requester.id);
+        const providerAfter = await getBalances(provider.id);
+        assert.equal(requesterAfter.escrow_balance, 0);
+        assert.equal(requesterAfter.available_balance, requesterBefore.available_balance + 5);
+        assert.equal(providerAfter.available_balance, providerBefore.available_balance);
+      });
+
+      it("Alt 2 provider fault: confirmed last session but hours short → full refund", async () => {
+        const requester = await createActor("uc07_short_req", 10);
+        const provider = await createActor("uc07_short_prov", 5);
+        const exchangeId = await acceptAndExpire(requester, provider, 5, {
+          completedHours: 2,
+          sessions: [{ hours: 2, status: "CONFIRMED" }],
+        });
+
+        const requesterBefore = await getBalances(requester.id);
+        const providerBefore = await getBalances(provider.id);
+
+        await resolveExpiredContracts();
+
+        const exchange = await prisma.serviceExchange.findUniqueOrThrow({
+          where: { id: exchangeId },
+        });
+        assert.equal(exchange.resolution_fault_party, "PROVIDER");
+
+        const requesterAfter = await getBalances(requester.id);
+        const providerAfter = await getBalances(provider.id);
+        assert.equal(requesterAfter.available_balance, requesterBefore.available_balance + 5);
+        assert.equal(providerAfter.available_balance, providerBefore.available_balance);
+      });
+
+      it("Ex 3: second cron pass does not double-pay", async () => {
+        const requester = await createActor("uc07_dup_req", 10);
+        const provider = await createActor("uc07_dup_prov", 5);
+        await acceptAndExpire(requester, provider, 5);
+
+        assert.equal(await resolveExpiredContracts(), 1);
+        const afterFirst = await getBalances(requester.id);
+        assert.equal(await resolveExpiredContracts(), 0);
+        const afterSecond = await getBalances(requester.id);
+        assert.deepEqual(afterSecond, afterFirst);
       });
     });
   });

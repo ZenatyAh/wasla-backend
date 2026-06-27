@@ -10,6 +10,7 @@ export const assertCanReviewExchange = async (
     select: {
       id: true,
       status: true,
+      escrow_status: true,
       provider_id: true,
       consumer_id: true,
     },
@@ -19,7 +20,11 @@ export const assertCanReviewExchange = async (
     throw new ReviewError("Service exchange not found", 404);
   }
 
-  if (exchange.status !== "COMPLETED") {
+  const isReviewable =
+    exchange.status === "COMPLETED" ||
+    (exchange.status === "DISPUTED" && exchange.escrow_status !== "HELD");
+
+  if (!isReviewable) {
     throw new ReviewError(
       "Reviews can only be submitted for completed service exchanges",
       400,

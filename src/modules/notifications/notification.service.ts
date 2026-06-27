@@ -18,12 +18,18 @@ const CONTRACT_NOTIFICATION_TYPES = new Set<NotificationType>([
   "DEADLINE_REJECTED",
   "DEADLINE_APPROACHING",
   "CONTRACT_AUTO_RESOLVED",
+  "CONTRACT_AUTO_COMPLETED",
+  "CONTRACT_AUTO_DISPUTED",
+  "CONTRACT_RESOLUTION_FAILED",
 ]);
 
 export type ContractNotificationMetadata = {
   contractEndDate?: Date | string | null;
   proposedEndDate?: Date | string | null;
   status?: string | null;
+  fault?: string | null;
+  providerCredits?: number | null;
+  refundCredits?: number | null;
 };
 
 const toIsoDate = (value: Date | string | null | undefined) => {
@@ -86,6 +92,9 @@ const buildContractNotificationData = async (
       contractEndDate: toIsoDate(metadata.contractEndDate),
       proposedEndDate: toIsoDate(metadata.proposedEndDate),
       status: metadata.status ?? null,
+      fault: metadata.fault ?? null,
+      providerCredits: metadata.providerCredits ?? null,
+      refundCredits: metadata.refundCredits ?? null,
     };
   }
 
@@ -185,11 +194,17 @@ export const createContractNotification = async (input: {
   contractEndDate?: Date | string | null;
   proposedEndDate?: Date | string | null;
   status?: string | null;
+  fault?: string | null;
+  providerCredits?: number | null;
+  refundCredits?: number | null;
 }) => {
   const data = await buildContractNotificationData(input.contractId, {
     contractEndDate: input.contractEndDate,
     proposedEndDate: input.proposedEndDate,
     status: input.status,
+    fault: input.fault,
+    providerCredits: input.providerCredits,
+    refundCredits: input.refundCredits,
   });
 
   const notification = await prisma.notification.create({

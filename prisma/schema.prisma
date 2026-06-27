@@ -195,6 +195,15 @@ enum NotificationType {
   DEADLINE_REJECTED
   DEADLINE_APPROACHING
   CONTRACT_AUTO_RESOLVED
+  CONTRACT_AUTO_COMPLETED
+  CONTRACT_AUTO_DISPUTED
+  CONTRACT_RESOLUTION_FAILED
+}
+
+enum ResolutionFaultParty {
+  NONE
+  SEEKER
+  PROVIDER
 }
 
 enum MessageStatus {
@@ -313,6 +322,7 @@ model ServiceExchange {
   completed_hours   Int                   @default(0)
   status            ServiceExchangeStatus @default(PENDING)
   escrow_status     EscrowStatus          @default(NONE)
+  resolution_fault_party     ResolutionFaultParty?
   maximum_end_date           DateTime
   proposed_end_date          DateTime?
   deadline_reminder_sent_at  DateTime?
