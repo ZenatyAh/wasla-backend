@@ -5,6 +5,21 @@ import { emitToUser } from "../../realtime/emit.js";
 import { ChatError } from "../chat/chat.errors.js";
 import type { ListNotificationsQuery } from "./notification.schema.js";
 
+const CONTRACT_NOTIFICATION_TYPES = new Set<NotificationType>([
+  "EXCHANGE_REQUESTED",
+  "EXCHANGE_ACCEPTED",
+  "EXCHANGE_REJECTED",
+  "EXCHANGE_CANCELED",
+  "SESSION_RECORDED",
+  "SESSION_CONFIRMED",
+  "SESSION_REJECTED",
+  "DEADLINE_PROPOSED",
+  "DEADLINE_APPROVED",
+  "DEADLINE_REJECTED",
+  "DEADLINE_APPROACHING",
+  "CONTRACT_AUTO_RESOLVED",
+]);
+
 const toNotificationResponse = (notification: {
   id: string;
   userId: number;
@@ -36,6 +51,28 @@ const publishNotificationToUser = (
   if (notification.type === "NEW_MESSAGE") {
     emitToUser(userId, "chat:notification:new", notification);
   }
+
+  if (CONTRACT_NOTIFICATION_TYPES.has(notification.type as NotificationType)) {
+    emitToUser(userId, "contract:notification:new", notification);
+  }
+};
+
+const buildContractNotificationData = async (contractId: number) => {
+  const exchange = await prisma.serviceExchange.findUnique({
+    where: { id: contractId },
+    select: {
+      maximum_end_date: true,
+      proposed_end_date: true,
+      status: true,
+    },
+  });
+
+  return {
+    contractId,
+    contractEndDate: exchange?.maximum_end_date.toISOString() ?? null,
+    proposedEndDate: exchange?.proposed_end_date?.toISOString() ?? null,
+    status: exchange?.status ?? null,
+  };
 };
 
 export const createMessageNotification = async (input: {
@@ -84,13 +121,15 @@ export const createContractNotification = async (input: {
   body: string;
   contractId: number;
 }) => {
+  const data = await buildContractNotificationData(input.contractId);
+
   const notification = await prisma.notification.create({
     data: {
       userId: input.recipientId,
       type: input.type,
       title: input.title,
       body: input.body,
-      data: { contractId: input.contractId },
+      data,
     },
   });
 

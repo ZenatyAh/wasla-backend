@@ -237,8 +237,17 @@ if (!hasTestDatabase) {
       const eventPromise = waitForSocketEvent<{
         type: string;
         userId: number;
-        data: { contractId: number };
+        data: {
+          contractId: number;
+          contractEndDate: string;
+          proposedEndDate: string | null;
+          status: string;
+        };
       }>(providerSocket!, "notification:new");
+
+      const contractEventPromise = waitForSocketEvent<{
+        type: string;
+      }>(providerSocket!, "contract:notification:new");
 
       const contractEndDate = new Date(
         Date.now() + 7 * 24 * 60 * 60 * 1000,
@@ -257,10 +266,15 @@ if (!hasTestDatabase) {
       assert.equal(requestResponse.status, 201);
 
       const payload = await eventPromise;
+      const contractPayload = await contractEventPromise;
 
       assert.equal(payload.type, "EXCHANGE_REQUESTED");
       assert.equal(payload.userId, providerId);
       assert.equal(payload.data.contractId, requestResponse.body.exchange.id);
+      assert.ok(payload.data.contractEndDate);
+      assert.equal(payload.data.proposedEndDate, null);
+      assert.equal(payload.data.status, "PENDING");
+      assert.equal(contractPayload.type, "EXCHANGE_REQUESTED");
     });
   });
 }

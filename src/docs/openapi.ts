@@ -54,10 +54,11 @@ export const openApiSpec = {
       description:
         "In-app notifications for chat messages and contract lifecycle events. No email is sent for contract notifications.\n\n" +
         "**Real-time delivery:** server emits Socket.IO event `notification:new` on personal room `user:{userId}` (auto-joined on connect). " +
-        "For `NEW_MESSAGE` only, a deprecated alias `chat:notification:new` is also emitted on the same room.\n\n" +
+        "For `NEW_MESSAGE` only, a deprecated alias `chat:notification:new` is also emitted on the same room. " +
+        "For contract lifecycle types, `contract:notification:new` is also emitted on the same room.\n\n" +
         "**REST inbox:** `GET /notifications` for history/pagination; `PATCH /notifications/:id/read` and `PATCH /notifications/read-all` for read state. " +
         "Call REST on app load and after reconnect to reconcile missed socket events.\n\n" +
-        "**Contract notification types** (payload `data`: `{ contractId: number }`):\n\n" +
+        "**Contract notification types** (payload `data`: `{ contractId, contractEndDate, proposedEndDate, status }`):\n\n" +
         "| Operation | Type | Recipient |\n" +
         "|-----------|------|----------|\n" +
         "| `POST /exchanges/request` | `EXCHANGE_REQUESTED` | Provider |\n" +
@@ -70,7 +71,8 @@ export const openApiSpec = {
         "| `POST /exchanges/{id}/deadline` | `DEADLINE_PROPOSED` | Requester |\n" +
         "| `PUT /exchanges/{id}/deadline/approve` | `DEADLINE_APPROVED` | Provider |\n" +
         "| `PUT /exchanges/{id}/deadline/reject` | `DEADLINE_REJECTED` | Provider |\n" +
-        "| Cron auto-resolve (hourly) | `CONTRACT_AUTO_RESOLVED` | Both parties |\n\n" +
+        "| Cron approaching deadline (hourly) | `DEADLINE_APPROACHING` | Both parties |\n" +
+        "| Cron auto-resolve (every 15 min) | `CONTRACT_AUTO_RESOLVED` | Both parties |\n\n" +
         "**Chat notification types** (payload `data`: `{ conversationId, messageId, postId? }`):\n" +
         "`NEW_MESSAGE` (also `chat:notification:new`). `CONVERSATION_STARTED` is reserved for future use.\n\n" +
         "Notification persistence failures are logged but never block the triggering HTTP action.",
@@ -92,7 +94,7 @@ export const openApiSpec = {
       description:
         "Time-credit service exchange (contract) lifecycle with escrow: request, accept, reject, deliver, confirm, cancel, dispute, work sessions, and deadline extensions. " +
         "Most state transitions push an in-app notification via Socket.IO `notification:new` on room `user:{userId}` (see Notifications tag). " +
-        "No notification is sent for deliver, whole-contract confirm, or dispute. Expired active contracts are auto-resolved hourly (cron) with `CONTRACT_AUTO_RESOLVED` sent to both parties.",
+        "No notification is sent for deliver, whole-contract confirm, or dispute. Expired active contracts are auto-resolved every 15 minutes (cron) with `CONTRACT_AUTO_RESOLVED` sent to both parties. Approaching deadlines trigger `DEADLINE_APPROACHING` hourly when less than 24 hours remain.",
     },
     {
       name: "Wallet",
@@ -1258,7 +1260,7 @@ export const openApiSpec = {
         description:
           "Paginated inbox history. For real-time delivery, listen for Socket.IO event `notification:new` on room `user:{userId}` " +
           "(auto-joined on connect). Call this endpoint on app load, pull-to-refresh, and after reconnect to reconcile missed events. " +
-          "Contract notifications include `data.contractId`; chat notifications include `data.conversationId` and `data.messageId`.",
+          "Contract notifications include `data.contractId`, `data.contractEndDate`, `data.proposedEndDate`, and `data.status`; chat notifications include `data.conversationId` and `data.messageId`.",
         security: [{ bearerAuth: [] }],
         parameters: [
           { name: "cursor", in: "query", schema: { type: "string" } },
@@ -3247,6 +3249,7 @@ export const openApiSpec = {
           "DEADLINE_PROPOSED",
           "DEADLINE_APPROVED",
           "DEADLINE_REJECTED",
+          "DEADLINE_APPROACHING",
           "CONTRACT_AUTO_RESOLVED",
         ],
         description: "In-app notification category aligned with the Prisma `NotificationType` enum.",
@@ -3256,6 +3259,23 @@ export const openApiSpec = {
         required: ["contractId"],
         properties: {
           contractId: { type: "integer", description: "Service exchange (contract) ID" },
+          contractEndDate: {
+            type: "string",
+            format: "date-time",
+            nullable: true,
+            description: "Agreed contract deadline (`maximum_end_date`)",
+          },
+          proposedEndDate: {
+            type: "string",
+            format: "date-time",
+            nullable: true,
+            description: "Pending deadline extension proposed by the provider",
+          },
+          status: {
+            type: "string",
+            nullable: true,
+            description: "Current contract status at notification time",
+          },
         },
       },
       NotificationMessageData: {
@@ -3276,6 +3296,11 @@ export const openApiSpec = {
         allOf: [{ $ref: "#/components/schemas/Notification" }],
         description:
           "Deprecated Socket.IO alias emitted on room `user:{userId}` when `type` is `NEW_MESSAGE` only. Prefer `notification:new`.",
+      },
+      ContractNotificationNewEvent: {
+        allOf: [{ $ref: "#/components/schemas/Notification" }],
+        description:
+          "Socket.IO alias emitted on room `user:{userId}` for contract lifecycle notification types. Also emitted as `notification:new`.",
       },
       Notification: {
         type: "object",

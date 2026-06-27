@@ -230,6 +230,7 @@ describe("OpenAPI spec", () => {
       "DEADLINE_PROPOSED",
       "DEADLINE_APPROVED",
       "DEADLINE_REJECTED",
+      "DEADLINE_APPROACHING",
       "CONTRACT_AUTO_RESOLVED",
     ]);
   });
@@ -247,5 +248,7 @@ describe("OpenAPI spec", () => {
     assert.match(notificationsTag.description, /user:\{userId\}/);
     assert.match(notificationsTag.description, /EXCHANGE_REQUESTED/);
     assert.match(notificationsTag.description, /CONTRACT_AUTO_RESOLVED/);
+    assert.match(notificationsTag.description, /contract:notification:new/);
+    assert.match(notificationsTag.description, /DEADLINE_APPROACHING/);
   });
 });

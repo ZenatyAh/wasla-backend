@@ -214,7 +214,7 @@ export const requestExchange = async (
     recipientId: data.providerId,
     type: "EXCHANGE_REQUESTED",
     title: "طلب خدمة جديد",
-    body: "هناك شخص يطلب إحدى خدماتك، يرجى مراجعة الطلب.",
+    body: `هناك شخص يطلب إحدى خدماتك. موعد انتهاء العقد: ${data.contractEndDate.toLocaleDateString("ar-EG")}.`,
     contractId: exchange.id,
   }).catch((err) => console.error("Notification failed", err));
 
@@ -875,11 +875,11 @@ export const proposeDeadlineExtension = async (
     recipientId: exchange.consumer_id,
     type: "DEADLINE_PROPOSED",
     title: "تم اقتراح موعد تسليم جديد",
-    body: "قام مقدم الخدمة باقتراح موعد تسليم جديد، يرجى مراجعته.",
+    body: `قام مقدم الخدمة باقتراح موعد تسليم جديد: ${data.proposedEndDate.toLocaleDateString("ar-EG")}.`,
     contractId: exchange.id,
   }).catch((err) => console.error("Notification failed", err));
 
-  return result;
+  return toExchangeResponse(result as ExchangeRecord);
 };
 
 export const approveDeadlineExtension = async (contractId: number, consumerId: number) => {
@@ -896,6 +896,7 @@ export const approveDeadlineExtension = async (contractId: number, consumerId: n
     data: {
       maximum_end_date: exchange.proposed_end_date,
       proposed_end_date: null,
+      deadline_reminder_sent_at: null,
     },
     select: exchangeSelect,
   });
@@ -904,11 +905,11 @@ export const approveDeadlineExtension = async (contractId: number, consumerId: n
     recipientId: exchange.provider_id,
     type: "DEADLINE_APPROVED",
     title: "تم الموافقة على الموعد الجديد",
-    body: "تم الموافقة على موعد التسليم الجديد.",
+    body: `تم الموافقة على موعد التسليم الجديد: ${exchange.proposed_end_date.toLocaleDateString("ar-EG")}.`,
     contractId: exchange.id,
   }).catch((err) => console.error("Notification failed", err));
 
-  return result;
+  return toExchangeResponse(result as ExchangeRecord);
 };
 
 export const rejectDeadlineExtension = async (contractId: number, consumerId: number) => {
@@ -934,7 +935,58 @@ export const rejectDeadlineExtension = async (contractId: number, consumerId: nu
     contractId: exchange.id,
   }).catch((err) => console.error("Notification failed", err));
 
-  return result;
+  return toExchangeResponse(result as ExchangeRecord);
+};
+
+export const notifyApproachingDeadlines = async () => {
+  const now = new Date();
+  const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  const contracts = await prisma.serviceExchange.findMany({
+    where: {
+      status: { in: ["IN_PROGRESS", "WAITING_CONFIRMATION"] },
+      maximum_end_date: { gt: now, lte: in24Hours },
+      deadline_reminder_sent_at: null,
+    },
+  });
+
+  let notifiedCount = 0;
+
+  for (const contract of contracts) {
+    const endDateLabel = contract.maximum_end_date.toLocaleDateString("ar-EG");
+
+    try {
+      await prisma.serviceExchange.update({
+        where: { id: contract.id },
+        data: { deadline_reminder_sent_at: now },
+      });
+
+      await createContractNotification({
+        recipientId: contract.provider_id,
+        type: "DEADLINE_APPROACHING",
+        title: "اقترب موعد انتهاء العقد",
+        body: `يتبقى أقل من 24 ساعة على موعد انتهاء العقد (${endDateLabel}).`,
+        contractId: contract.id,
+      }).catch((err) => console.error("Notification failed", err));
+
+      await createContractNotification({
+        recipientId: contract.consumer_id,
+        type: "DEADLINE_APPROACHING",
+        title: "اقترب موعد انتهاء العقد",
+        body: `يتبقى أقل من 24 ساعة على موعد انتهاء العقد (${endDateLabel}).`,
+        contractId: contract.id,
+      }).catch((err) => console.error("Notification failed", err));
+
+      notifiedCount++;
+    } catch (error) {
+      console.error(
+        `Failed to send deadline reminder for contract ${contract.id}:`,
+        error,
+      );
+    }
+  }
+
+  return notifiedCount;
 };
 
 export const resolveExpiredContracts = async () => {

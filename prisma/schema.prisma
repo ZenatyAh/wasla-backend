@@ -193,6 +193,7 @@ enum NotificationType {
   DEADLINE_PROPOSED
   DEADLINE_APPROVED
   DEADLINE_REJECTED
+  DEADLINE_APPROACHING
   CONTRACT_AUTO_RESOLVED
 }
 
@@ -312,9 +313,10 @@ model ServiceExchange {
   completed_hours   Int                   @default(0)
   status            ServiceExchangeStatus @default(PENDING)
   escrow_status     EscrowStatus          @default(NONE)
-  maximum_end_date  DateTime
-  proposed_end_date DateTime?
-  accepted_at       DateTime?
+  maximum_end_date           DateTime
+  proposed_end_date          DateTime?
+  deadline_reminder_sent_at  DateTime?
+  accepted_at                DateTime?
   delivered_at      DateTime?
   completed_at      DateTime?
   canceled_at       DateTime?
