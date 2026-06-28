@@ -63,7 +63,7 @@ export const createPostService = async (data: CreatePostInput,userId: number) =>
 }
 
 export const listPublishedPostsService = async (query: ListPostsQuery) => {
-    const limit = query.limit ?? 20
+    const limit = query.limit ?? 100
     const cursorFilter = await buildPostCursorFilter(query.cursor)
 
     const posts = await prisma.post.findMany({
@@ -84,7 +84,7 @@ export const listMyPostsService = async (
     userId: number,
     query: ListPostsQuery,
 ) => {
-    const limit = query.limit ?? 20
+    const limit = query.limit ?? 100
     const cursorFilter = await buildPostCursorFilter(query.cursor)
 
     const posts = await prisma.post.findMany({
@@ -217,7 +217,7 @@ export const listSavedPostsService = async (
     userId: number,
     query: ListPostsQuery,
 ) => {
-    const limit = query.limit ?? 20
+    const limit = query.limit ?? 100
     const cursorFilter = await buildSavedPostCursorFilter(query.cursor)
 
     const savedPosts = await prisma.savedPost.findMany({

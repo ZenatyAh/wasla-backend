@@ -639,7 +639,7 @@ export const openApiSpec = {
           {
             name: "limit",
             in: "query",
-            schema: { type: "integer", default: 20, maximum: 50 },
+            schema: { type: "integer", default: 100, maximum: 100 },
           },
         ],
         responses: {
@@ -669,7 +669,7 @@ export const openApiSpec = {
           {
             name: "limit",
             in: "query",
-            schema: { type: "integer", default: 20, maximum: 50 },
+            schema: { type: "integer", default: 100, maximum: 100 },
           },
         ],
         responses: {
@@ -702,7 +702,7 @@ export const openApiSpec = {
           {
             name: "limit",
             in: "query",
-            schema: { type: "integer", default: 20, maximum: 50 },
+            schema: { type: "integer", default: 100, maximum: 100 },
           },
         ],
         responses: {
@@ -2716,7 +2716,7 @@ export const openApiSpec = {
             type: "integer",
             minimum: 1,
             description:
-              "Optional max results. When omitted, all matching posts are returned.",
+              "Optional max results when no filters are applied. When filters are present, all matching posts are returned regardless of topK.",
             example: 20,
           },
           threshold: {

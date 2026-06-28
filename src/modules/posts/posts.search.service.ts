@@ -34,22 +34,39 @@ const hasActiveFilters = (filters?: SearchPostsInput["filters"]) =>
 const countPublishedPosts = async () =>
   prisma.post.count({ where: { status: "PUBLISHED" } });
 
+const countFilteredPublishedPosts = async (
+  filters?: SearchPostsInput["filters"],
+) =>
+  prisma.post.count({
+    where: buildFilteredWhereClause(filters, { status: "PUBLISHED" }),
+  });
+
 const resolveRecommenderTopK = async (
   topK: number | undefined,
   filters?: SearchPostsInput["filters"],
 ): Promise<number> => {
-  const filtered = hasActiveFilters(filters);
-
-  if (topK !== undefined) {
-    return filtered ? Math.max(100, topK * 5) : topK;
+  if (hasActiveFilters(filters)) {
+    return countFilteredPublishedPosts(filters);
   }
 
-  const totalPublished = await countPublishedPosts();
-  return filtered ? Math.max(totalPublished, 100) : totalPublished;
+  if (topK !== undefined) {
+    return topK;
+  }
+
+  return countPublishedPosts();
 };
 
-const limitResults = <T>(items: T[], topK?: number) =>
-  topK !== undefined ? items.slice(0, topK) : items;
+const limitResults = <T>(
+  items: T[],
+  topK: number | undefined,
+  filters?: SearchPostsInput["filters"],
+) => {
+  if (hasActiveFilters(filters)) {
+    return items;
+  }
+
+  return topK !== undefined ? items.slice(0, topK) : items;
+};
 
 const buildFilteredWhereClause = (
   filters?: SearchPostsInput["filters"],
@@ -94,7 +111,7 @@ const fallbackSearch = async (
   const posts = await prisma.post.findMany({
     where: whereClause,
     orderBy: [{ created_at: "desc" }, { id: "desc" }],
-    ...(topK !== undefined ? { take: topK } : {}),
+    ...(topK !== undefined && !hasActiveFilters(filters) ? { take: topK } : {}),
     select: postSelect,
   });
 
@@ -114,6 +131,15 @@ export const searchPostsService = async (input: SearchPostsInput) => {
 
   try {
     const recommenderTopK = await resolveRecommenderTopK(topK, filters);
+
+    if (recommenderTopK === 0) {
+      return {
+        query,
+        count: 0,
+        source: "recommender" as const,
+        results: [],
+      };
+    }
 
     const aiResponse = await fetchSearchResults(query, {
       top_k: recommenderTopK,
@@ -167,6 +193,7 @@ export const searchPostsService = async (input: SearchPostsInput) => {
           };
         }),
       topK,
+      filters,
     );
 
     return {

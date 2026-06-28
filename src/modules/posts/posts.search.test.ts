@@ -193,6 +193,36 @@ if (!hasTestDatabase) {
         const postIdsMismatch = responseMismatch.body.results.map((r: any) => r.post.id);
         assert.ok(!postIdsMismatch.includes(postId));
       });
+
+      it("returns all filtered matches even when topK is smaller", async () => {
+        const secondPost = await prisma.post.create({
+          data: {
+            user_id: userId,
+            title: `${searchTerm} خدمة كهرباء`,
+            description: "وصف اختبار إضافي للفلترة",
+            category: "OFFER",
+            service_mode: "ONLINE",
+            assigned_time_credits: 3,
+            status: "PUBLISHED",
+          },
+        });
+
+        try {
+          const response = await request(app)
+            .post("/posts/search")
+            .set({ Authorization: `Bearer ${token}` })
+            .send({
+              query: searchTerm,
+              topK: 1,
+              filters: { category: "OFFER" },
+            });
+
+          assert.equal(response.status, 200);
+          assert.ok(response.body.results.length >= 2);
+        } finally {
+          await prisma.post.delete({ where: { id: secondPost.id } });
+        }
+      });
     });
 
     describe("Recommender Semantic Search path", () => {

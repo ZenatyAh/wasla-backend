@@ -36,7 +36,7 @@ export const updatePostSchema = baseCreatePostSchema
 
 export const listPostsQuerySchema = z.object({
     cursor: z.coerce.number().int().positive().optional(),
-    limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(100),
 })
 
 export const searchPostsFiltersSchema = z.object({
