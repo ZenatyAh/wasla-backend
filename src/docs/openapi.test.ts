@@ -319,6 +319,49 @@ describe("OpenAPI spec", () => {
     assert.ok(notificationData.properties.refundCredits);
   });
 
+  it("documents pending review contracts on login and refresh", () => {
+    const schemas = openApiSpec.components.schemas;
+
+    assert.ok("LoginAuthResponse" in schemas);
+    assert.ok("RefreshResponse" in schemas);
+    assert.ok("PendingReviewContract" in schemas);
+
+    const loginPost = openApiSpec.paths["/auth/login"].post;
+    const refreshPost = openApiSpec.paths["/auth/refresh"].post;
+
+    assert.match(loginPost.description, /pendingReviewContracts/);
+    assert.match(refreshPost.description, /pendingReviewContracts/);
+
+    const loginSchema =
+      loginPost.responses["200"].content["application/json"].schema;
+    assert.equal(loginSchema.$ref, "#/components/schemas/LoginAuthResponse");
+
+    const refreshSchema =
+      refreshPost.responses["200"].content["application/json"].schema;
+    assert.equal(refreshSchema.$ref, "#/components/schemas/RefreshResponse");
+
+    assert.deepEqual(schemas.PendingReviewContract.properties.role.enum, [
+      "provider",
+      "requester",
+    ]);
+    assert.deepEqual(schemas.PendingReviewContract.properties.status.enum, [
+      "COMPLETED",
+      "DISPUTED",
+    ]);
+
+    const registerSchema =
+      openApiSpec.paths["/auth/register"].post.responses["200"].content[
+        "application/json"
+      ].schema;
+    assert.equal(registerSchema.$ref, "#/components/schemas/AuthResponse");
+    assert.equal("pendingReviewContracts" in schemas.AuthResponse.properties, false);
+
+    const authTag = openApiSpec.tags.find(
+      (tag: { name?: string }) => tag.name === "Auth",
+    );
+    assert.match(authTag.description, /pendingReviewContracts/);
+  });
+
   it("documents post archiving on contract accept", () => {
     const acceptPut = openApiSpec.paths["/exchanges/{id}/accept"].put;
     const requestPost = openApiSpec.paths["/exchanges/request"].post;

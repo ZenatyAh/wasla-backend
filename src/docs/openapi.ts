@@ -43,7 +43,8 @@ export const openApiSpec = {
     {
       name: "Auth",
       description:
-        "Authentication and session endpoints. Refresh token cookie: production uses HttpOnly, SameSite=None, Secure; local development uses SameSite=Lax.",
+        "Authentication and session endpoints. Refresh token cookie: production uses HttpOnly, SameSite=None, Secure; local development uses SameSite=Lax. " +
+        "`POST /auth/login` and `POST /auth/refresh` return `pendingReviewContracts`: completed or reviewable contracts where the authenticated user has not submitted a review yet (use to prompt the review modal on app open).",
     },
     {
       name: "User",
@@ -112,7 +113,8 @@ export const openApiSpec = {
       description:
         "Service exchange reviews and ratings. " +
         "Reviews are allowed when the contract is `COMPLETED`, or when it is `DISPUTED` with escrow already settled (`RELEASED` or `REFUNDED`) after deadline auto-resolution. " +
-        "Manual disputes with escrow still `HELD` cannot be reviewed until resolved.",
+        "Manual disputes with escrow still `HELD` cannot be reviewed until resolved. " +
+        "Contracts awaiting the user's review are listed in `pendingReviewContracts` on `POST /auth/login` and `POST /auth/refresh`.",
     },
     {
       name: "Skills",
@@ -340,6 +342,10 @@ export const openApiSpec = {
       post: {
         tags: ["Auth"],
         summary: "Login with email and password",
+        description:
+          "Authenticates the user, creates a session, and sets the httpOnly refresh token cookie. " +
+          "The response includes `pendingReviewContracts`: contracts the user participated in that are reviewable (`COMPLETED`, or `DISPUTED` with escrow settled) but the user has not reviewed yet. " +
+          "The frontend should prompt for reviews when this array is non-empty.",
         requestBody: {
           required: true,
           content: {
@@ -357,7 +363,7 @@ export const openApiSpec = {
         responses: {
           "200": {
             description:
-              "Login successful. A httpOnly refreshToken cookie is also set.",
+              "Login successful. Returns access token, user summary, and contracts pending review. A httpOnly refreshToken cookie is also set.",
             headers: {
               "Set-Cookie": {
                 schema: { type: "string" },
@@ -368,7 +374,7 @@ export const openApiSpec = {
             content: {
               "application/json": {
                 schema: {
-                  $ref: "#/components/schemas/AuthResponse",
+                  $ref: "#/components/schemas/LoginAuthResponse",
                 },
                 example: {
                   accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -533,7 +539,8 @@ export const openApiSpec = {
         tags: ["Auth"],
         summary: "Rotate refresh token and issue a new access token",
         description:
-          "Reads the refreshToken from the httpOnly cookie. For manual testing, send a Cookie header.",
+          "Reads the refreshToken from the httpOnly cookie. For manual testing, send a Cookie header. " +
+          "Also returns `pendingReviewContracts` (same shape as login) so the frontend can prompt for outstanding reviews when the app restores a session.",
         parameters: [
           {
             name: "Cookie",
@@ -548,7 +555,7 @@ export const openApiSpec = {
         responses: {
           "200": {
             description:
-              "Refresh successful. A rotated httpOnly refreshToken cookie is also set.",
+              "Refresh successful. Returns a new access token and contracts pending review. A rotated httpOnly refreshToken cookie is also set.",
             headers: {
               "Set-Cookie": {
                 schema: { type: "string" },
@@ -2632,14 +2639,25 @@ export const openApiSpec = {
             },
             required: ["id", "email", "username"],
           },
-          pendingReviewContracts: {
-            type: "array",
-            description:
-              "Completed (or reviewable) contracts the user has not reviewed yet. Present on login; omitted on register.",
-            items: { $ref: "#/components/schemas/PendingReviewContract" },
-          },
         },
         required: ["accessToken", "user"],
+      },
+      LoginAuthResponse: {
+        allOf: [
+          { $ref: "#/components/schemas/AuthResponse" },
+          {
+            type: "object",
+            properties: {
+              pendingReviewContracts: {
+                type: "array",
+                description:
+                  "Reviewable contracts where the logged-in user has not submitted a review yet. Empty when none are pending.",
+                items: { $ref: "#/components/schemas/PendingReviewContract" },
+              },
+            },
+            required: ["pendingReviewContracts"],
+          },
+        ],
       },
       RefreshResponse: {
         type: "object",
@@ -2647,6 +2665,8 @@ export const openApiSpec = {
           accessToken: { type: "string" },
           pendingReviewContracts: {
             type: "array",
+            description:
+              "Reviewable contracts where the session user has not submitted a review yet. Empty when none are pending.",
             items: { $ref: "#/components/schemas/PendingReviewContract" },
           },
         },
@@ -2654,13 +2674,27 @@ export const openApiSpec = {
       },
       PendingReviewContract: {
         type: "object",
+        description:
+          "Lightweight contract summary for prompting a post-completion review. `reviewee` is the other party the user should rate.",
         properties: {
-          id: { type: "integer" },
+          id: {
+            type: "integer",
+            description: "Service exchange (contract) id; use as `serviceExchangeId` in POST /reviews",
+          },
           postId: { type: "integer", nullable: true },
           postTitle: { type: "string", nullable: true },
-          status: { type: "string", example: "COMPLETED" },
+          status: {
+            type: "string",
+            enum: ["COMPLETED", "DISPUTED"],
+            example: "COMPLETED",
+          },
           completedAt: { type: "string", format: "date-time", nullable: true },
-          role: { type: "string", enum: ["provider", "requester"] },
+          role: {
+            type: "string",
+            enum: ["provider", "requester"],
+            description:
+              "Authenticated user's role in this contract (`requester` is the consumer who paid credits)",
+          },
           reviewee: { $ref: "#/components/schemas/UserSummary" },
         },
         required: [
