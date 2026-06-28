@@ -4,6 +4,7 @@ import {
   verifyRefreshToken,
 } from "../../common/utils/jwt.js";
 import { prisma } from "../../lib/prisma.js";
+import { listPendingReviewContracts } from "../reviews/review.service.js";
 
 export const refreshService = async (refreshToken?: string) => {
   // 1 - check if refreshToken found
@@ -45,8 +46,12 @@ export const refreshService = async (refreshToken?: string) => {
     },
   });
 
+  const userId = Number(payload.userId);
+  const pendingReviewContracts = await listPendingReviewContracts(userId);
+
   return {
     accessToken: newAccessToken,
     refreshToken: newRefreshToken,
+    pendingReviewContracts,
   };
 };

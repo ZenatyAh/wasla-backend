@@ -13,6 +13,7 @@ export const loginController = async (req: Request, res: Response) => {
     return res.json({
       accessToken: result.accessToken,
       user: result.user,
+      pendingReviewContracts: result.pendingReviewContracts,
     });
   } catch (err: unknown) {
     return sendError(res, 400, getErrorMessage(err, "Login failed"));

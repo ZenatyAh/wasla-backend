@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import bcrypt from "bcrypt";
+import { listPendingReviewContracts } from "../reviews/review.service.js";
 import { createSession } from "./register/create_session.js";
 // Function Controller
 export const loginService = async (data: any, meta: any) => {
@@ -27,6 +28,7 @@ export const loginService = async (data: any, meta: any) => {
   // }
 
   const { refreshToken, accessToken } = await createSession(user.id, meta);
+  const pendingReviewContracts = await listPendingReviewContracts(user.id);
 
   return {
     refreshToken,
@@ -36,5 +38,6 @@ export const loginService = async (data: any, meta: any) => {
       email: user.email,
       username: user.username,
     },
+    pendingReviewContracts,
   };
 };

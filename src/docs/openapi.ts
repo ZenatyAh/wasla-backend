@@ -377,6 +377,22 @@ export const openApiSpec = {
                     email: "eng.ahmedzenaty@gmail.com",
                     username: "ahmed_zenaty_test",
                   },
+                  pendingReviewContracts: [
+                    {
+                      id: 42,
+                      postId: 10,
+                      postTitle: "تصميم شعار",
+                      status: "COMPLETED",
+                      completedAt: "2026-06-20T10:00:00.000Z",
+                      role: "requester",
+                      reviewee: {
+                        id: 5,
+                        username: "provider_user",
+                        name: "أحمد",
+                        profilePicture: null,
+                      },
+                    },
+                  ],
                 },
               },
             },
@@ -542,8 +558,12 @@ export const openApiSpec = {
             },
             content: {
               "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/RefreshResponse",
+                },
                 example: {
                   accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                  pendingReviewContracts: [],
                 },
               },
             },
@@ -2612,8 +2632,46 @@ export const openApiSpec = {
             },
             required: ["id", "email", "username"],
           },
+          pendingReviewContracts: {
+            type: "array",
+            description:
+              "Completed (or reviewable) contracts the user has not reviewed yet. Present on login; omitted on register.",
+            items: { $ref: "#/components/schemas/PendingReviewContract" },
+          },
         },
         required: ["accessToken", "user"],
+      },
+      RefreshResponse: {
+        type: "object",
+        properties: {
+          accessToken: { type: "string" },
+          pendingReviewContracts: {
+            type: "array",
+            items: { $ref: "#/components/schemas/PendingReviewContract" },
+          },
+        },
+        required: ["accessToken", "pendingReviewContracts"],
+      },
+      PendingReviewContract: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          postId: { type: "integer", nullable: true },
+          postTitle: { type: "string", nullable: true },
+          status: { type: "string", example: "COMPLETED" },
+          completedAt: { type: "string", format: "date-time", nullable: true },
+          role: { type: "string", enum: ["provider", "requester"] },
+          reviewee: { $ref: "#/components/schemas/UserSummary" },
+        },
+        required: [
+          "id",
+          "postId",
+          "postTitle",
+          "status",
+          "completedAt",
+          "role",
+          "reviewee",
+        ],
       },
       ErrorResponse: {
         type: "object",

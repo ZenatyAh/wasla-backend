@@ -14,9 +14,13 @@ if (!hasTestDatabase) {
 } else {
   const bcrypt = (await import("bcrypt")).default;
   const request = (await import("supertest")).default;
-  const { signAccessToken } = await import("../../common/utils/jwt.js");
+  const { v4: uuidv4 } = await import("uuid");
+  const { signAccessToken, RefreshAccessToken } = await import(
+    "../../common/utils/jwt.js"
+  );
   const { prisma } = await import("../../lib/prisma.js");
   const { default: app } = await import("../../server.js");
+  const { listPendingReviewContracts } = await import("./review.service.js");
 
   const runId = Date.now().toString();
   const password = "TestPass@123";
@@ -31,6 +35,7 @@ if (!hasTestDatabase) {
   let providerToken = "";
   let consumerToken = "";
   let outsiderToken = "";
+  let providerEmail = "";
 
   const authHeader = (token: string) => ({
     Authorization: `Bearer ${token}`,
@@ -70,6 +75,7 @@ if (!hasTestDatabase) {
       providerId = provider.id;
       consumerId = consumer.id;
       outsiderId = outsider.id;
+      providerEmail = provider.email;
 
       providerToken = signAccessToken(String(providerId));
       consumerToken = signAccessToken(String(consumerId));
@@ -270,6 +276,189 @@ if (!hasTestDatabase) {
           where: { id: frozenDispute.id },
         });
       }
+    });
+
+    describe("Pending review contracts", () => {
+      const createCompletedExchange = async (
+        overrides: Record<string, unknown> = {},
+      ) =>
+        prisma.serviceExchange.create({
+          data: {
+            post_id: postId,
+            provider_id: providerId,
+            consumer_id: consumerId,
+            time_credits: 2,
+            status: "COMPLETED",
+            maximum_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            completed_at: new Date(),
+            ...overrides,
+          },
+        });
+
+      it("includes completed exchange when user has not reviewed yet", async () => {
+        const exchange = await createCompletedExchange();
+
+        try {
+          const pending = await listPendingReviewContracts(providerId);
+          assert.ok(
+            pending.some((contract) => contract.id === exchange.id),
+          );
+          assert.equal(pending.find((c) => c.id === exchange.id)?.role, "provider");
+          assert.equal(
+            pending.find((c) => c.id === exchange.id)?.reviewee.id,
+            consumerId,
+          );
+        } finally {
+          await prisma.serviceExchange.delete({ where: { id: exchange.id } });
+        }
+      });
+
+      it("excludes exchange after the user has submitted a review", async () => {
+        const exchange = await createCompletedExchange();
+
+        try {
+          await prisma.review.create({
+            data: {
+              service_exchange_id: exchange.id,
+              reviewer_id: providerId,
+              reviewee_id: consumerId,
+              rating: 5,
+              comment: "Done",
+            },
+          });
+
+          const pending = await listPendingReviewContracts(providerId);
+          assert.ok(!pending.some((contract) => contract.id === exchange.id));
+        } finally {
+          await prisma.review.deleteMany({
+            where: { service_exchange_id: exchange.id },
+          });
+          await prisma.serviceExchange.delete({ where: { id: exchange.id } });
+        }
+      });
+
+      it("excludes in-progress exchanges", async () => {
+        const exchange = await prisma.serviceExchange.create({
+          data: {
+            post_id: postId,
+            provider_id: providerId,
+            consumer_id: consumerId,
+            time_credits: 2,
+            status: "IN_PROGRESS",
+            maximum_end_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        });
+
+        try {
+          const pending = await listPendingReviewContracts(providerId);
+          assert.ok(!pending.some((contract) => contract.id === exchange.id));
+        } finally {
+          await prisma.serviceExchange.delete({ where: { id: exchange.id } });
+        }
+      });
+
+      it("includes exchange when only the other party has reviewed", async () => {
+        const exchange = await createCompletedExchange();
+
+        try {
+          await prisma.review.create({
+            data: {
+              service_exchange_id: exchange.id,
+              reviewer_id: consumerId,
+              reviewee_id: providerId,
+              rating: 4,
+              comment: "Thanks",
+            },
+          });
+
+          const pending = await listPendingReviewContracts(providerId);
+          assert.ok(pending.some((contract) => contract.id === exchange.id));
+        } finally {
+          await prisma.review.deleteMany({
+            where: { service_exchange_id: exchange.id },
+          });
+          await prisma.serviceExchange.delete({ where: { id: exchange.id } });
+        }
+      });
+
+      it("includes settled disputed exchanges", async () => {
+        const exchange = await prisma.serviceExchange.create({
+          data: {
+            post_id: postId,
+            provider_id: providerId,
+            consumer_id: consumerId,
+            time_credits: 3,
+            status: "DISPUTED",
+            escrow_status: "RELEASED",
+            maximum_end_date: new Date(Date.now() - 60_000),
+            completed_at: new Date(),
+            resolution_fault_party: "SEEKER",
+          },
+        });
+
+        try {
+          const pending = await listPendingReviewContracts(consumerId);
+          assert.ok(pending.some((contract) => contract.id === exchange.id));
+        } finally {
+          await prisma.serviceExchange.delete({ where: { id: exchange.id } });
+        }
+      });
+
+      it("returns pendingReviewContracts on login", async () => {
+        const exchange = await createCompletedExchange();
+
+        try {
+          const response = await request(app).post("/auth/login").send({
+            email: providerEmail,
+            password,
+          });
+
+          assert.equal(response.status, 200);
+          assert.ok(Array.isArray(response.body.pendingReviewContracts));
+          assert.ok(
+            response.body.pendingReviewContracts.some(
+              (contract: { id: number }) => contract.id === exchange.id,
+            ),
+          );
+        } finally {
+          await prisma.session.deleteMany({ where: { user_id: providerId } });
+          await prisma.serviceExchange.delete({ where: { id: exchange.id } });
+        }
+      });
+
+      it("returns pendingReviewContracts on refresh", async () => {
+        const exchange = await createCompletedExchange();
+        const refreshToken = RefreshAccessToken(String(providerId));
+
+        await prisma.session.create({
+          data: {
+            id: uuidv4(),
+            user_id: providerId,
+            refresh_token: refreshToken,
+            device_info: "test-device",
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+        });
+
+        try {
+          const response = await request(app)
+            .post("/auth/refresh")
+            .set("Cookie", `refreshToken=${refreshToken}`);
+
+          assert.equal(response.status, 200);
+          assert.ok(Array.isArray(response.body.pendingReviewContracts));
+          assert.ok(
+            response.body.pendingReviewContracts.some(
+              (contract: { id: number }) => contract.id === exchange.id,
+            ),
+          );
+        } finally {
+          await prisma.session.deleteMany({
+            where: { refresh_token: refreshToken },
+          });
+          await prisma.serviceExchange.delete({ where: { id: exchange.id } });
+        }
+      });
     });
   });
 }

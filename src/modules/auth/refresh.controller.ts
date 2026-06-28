@@ -15,6 +15,7 @@ export const refreshController = async (req: Request, res: Response) => {
 
     return res.json({
       accessToken: result.accessToken,
+      pendingReviewContracts: result.pendingReviewContracts,
     });
   } catch (err: unknown) {
     return sendError(res, 403, getErrorMessage(err, "Refresh failed"));

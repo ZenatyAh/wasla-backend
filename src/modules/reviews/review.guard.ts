@@ -1,4 +1,5 @@
 import { prisma } from "../../lib/prisma.js";
+import { getRevieweeId, isExchangeReviewable } from "./review.criteria.js";
 import { ReviewError } from "./review.errors.js";
 
 export const assertCanReviewExchange = async (
@@ -20,11 +21,7 @@ export const assertCanReviewExchange = async (
     throw new ReviewError("Service exchange not found", 404);
   }
 
-  const isReviewable =
-    exchange.status === "COMPLETED" ||
-    (exchange.status === "DISPUTED" && exchange.escrow_status !== "HELD");
-
-  if (!isReviewable) {
+  if (!isExchangeReviewable(exchange)) {
     throw new ReviewError(
       "Reviews can only be submitted for completed service exchanges",
       400,
@@ -59,10 +56,5 @@ export const assertCanReviewExchange = async (
     );
   }
 
-  const revieweeId =
-    exchange.provider_id === reviewerId
-      ? exchange.consumer_id
-      : exchange.provider_id;
-
-  return { revieweeId };
+  return { revieweeId: getRevieweeId(exchange, reviewerId) };
 };

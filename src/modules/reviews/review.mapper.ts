@@ -27,3 +27,33 @@ export const toReviewResponse = (review: ReviewRecord) => ({
   createdAt: review.created_at,
   reviewer: toReviewerSummary(review.reviewer),
 });
+
+type PendingReviewExchangeRecord = {
+  id: number;
+  post_id: number | null;
+  provider_id: number;
+  consumer_id: number;
+  status: string;
+  completed_at: Date | null;
+  post: { title: string } | null;
+  provider: ReviewerRecord;
+  consumer: ReviewerRecord;
+};
+
+export const toPendingReviewContract = (
+  exchange: PendingReviewExchangeRecord,
+  userId: number,
+) => {
+  const isProvider = exchange.provider_id === userId;
+  const reviewee = isProvider ? exchange.consumer : exchange.provider;
+
+  return {
+    id: exchange.id,
+    postId: exchange.post_id,
+    postTitle: exchange.post?.title ?? null,
+    status: exchange.status,
+    completedAt: exchange.completed_at,
+    role: isProvider ? ("provider" as const) : ("requester" as const),
+    reviewee: toReviewerSummary(reviewee),
+  };
+};
