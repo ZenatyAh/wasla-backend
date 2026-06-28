@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  DATE_ONLY_CONTRACT_END,
+  parseContractEndDate,
+} from "../../common/utils/contractDeadline.js";
 
 export const exchangeStatusSchema = z.enum([
   "PENDING",
@@ -11,11 +15,14 @@ export const exchangeStatusSchema = z.enum([
   "DISPUTED",
 ]);
 
-const futureContractEndDate = z.coerce
-  .date()
-  .refine((val) => val > new Date(), {
-    message: "Contract end date must be in the future",
-  });
+const contractEndDateField = (label: string) =>
+  z
+    .string()
+    .regex(DATE_ONLY_CONTRACT_END, `${label} must be YYYY-MM-DD`)
+    .transform(parseContractEndDate)
+    .refine((val) => val > new Date(), {
+      message: `${label} must be in the future`,
+    });
 
 export const createExchangeSchema = z.preprocess(
   (data) => {
@@ -34,7 +41,7 @@ export const createExchangeSchema = z.preprocess(
     postId: z.coerce.number().int().positive(),
     providerId: z.coerce.number().int().positive(),
     duration: z.coerce.number().int().positive().max(100000),
-    contractEndDate: futureContractEndDate,
+    contractEndDate: contractEndDateField("Contract end date"),
   }),
 );
 
@@ -60,6 +67,6 @@ export const sessionIdParamSchema = z.coerce.number().int().positive();
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 
 export const deadlineExtensionSchema = z.object({
-  proposedEndDate: z.coerce.date().refine(val => val > new Date(), { message: "Proposed end date must be in the future" }),
+  proposedEndDate: contractEndDateField("Proposed end date"),
 });
 export type DeadlineExtensionInput = z.infer<typeof deadlineExtensionSchema>;

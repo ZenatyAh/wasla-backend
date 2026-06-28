@@ -7,8 +7,9 @@ const contractNotificationDelivery = (
   "`DEADLINE_APPROACHING` also includes `canProposeExtension` (provider) and `canApproveExtension` (requester).";
 
 const contractDeadlineWorkflow =
-  "**Contract deadline (`maximum_end_date`):** the requester sets it at creation as `contractEndDate` (legacy alias `maximumEndDate`). " +
-  "It is returned as `contractEndDate`; a pending extension is `proposedEndDate`. " +
+  "**Contract deadline (`maximum_end_date`):** the requester sets it at creation as `contractEndDate` (legacy alias `maximumEndDate`) using **YYYY-MM-DD** (date only). " +
+  "The backend stores it as **23:59:59.999** on that calendar day in **Asia/Jerusalem** (override via `CONTRACT_DEADLINE_TIMEZONE`). " +
+  "It is returned as `contractEndDate` (ISO date-time); a pending extension is `proposedEndDate`. " +
   "Only the provider may propose an extension; only the requester may approve or reject it. " +
   "On approval, `contractEndDate` is updated and any prior deadline reminder is reset. " +
   "Every 15 minutes, cron sends `DEADLINE_APPROACHING` to both parties when less than 24 hours remain (once per deadline). " +
@@ -1319,7 +1320,7 @@ export const openApiSpec = {
                       body: "يتبقى أقل من 24 ساعة على موعد انتهاء العقد (١‏/٧‏/٢٠٢٦).",
                       data: {
                         contractId: 42,
-                        contractEndDate: "2026-07-01T00:00:00.000Z",
+                        contractEndDate: "2026-07-01T20:59:59.999Z",
                         proposedEndDate: null,
                         status: "IN_PROGRESS",
                         fault: null,
@@ -1339,7 +1340,7 @@ export const openApiSpec = {
                       body: "انتهت مدة العقد ولم يتم تأكيد آخر جلسة عمل. تم تحويل الساعات المؤكدة لمقدم الخدمة وإرجاع المتبقي.",
                       data: {
                         contractId: 42,
-                        contractEndDate: "2026-07-01T00:00:00.000Z",
+                        contractEndDate: "2026-07-01T20:59:59.999Z",
                         proposedEndDate: null,
                         status: "DISPUTED",
                         fault: "SEEKER",
@@ -1739,7 +1740,7 @@ export const openApiSpec = {
         description:
           "Creates a PENDING contract. No time credits are deducted at this stage. The requester is the authenticated user; you cannot request a service from yourself, and you must currently hold at least `duration` available credits. " +
           "The post must be `PUBLISHED` and owned by `providerId`. " +
-          "`contractEndDate` (legacy alias `maximumEndDate`) is stored as the agreed deadline and included in the notification payload. " +
+          "`contractEndDate` (legacy alias `maximumEndDate`) must be **YYYY-MM-DD**; stored as 23:59:59.999 Asia/Jerusalem on that day. " +
           contractNotificationDelivery("EXCHANGE_REQUESTED", "provider"),
         security: [{ bearerAuth: [] }],
         requestBody: {
@@ -1751,7 +1752,7 @@ export const openApiSpec = {
                 postId: 1,
                 providerId: 2,
                 duration: 3,
-                contractEndDate: "2026-07-01T00:00:00.000Z",
+                contractEndDate: "2026-07-01",
               },
             },
           },
@@ -2911,9 +2912,10 @@ export const openApiSpec = {
         properties: {
           proposedEndDate: {
             type: "string",
-            format: "date-time",
-            description: "Proposed new contract deadline. Must be strictly in the future.",
-            example: "2026-08-01T00:00:00.000Z",
+            format: "date",
+            description:
+              "Proposed new contract deadline (YYYY-MM-DD). Stored as 23:59:59.999 Asia/Jerusalem on that day. Must be strictly in the future.",
+            example: "2026-08-01",
           },
         },
       },
@@ -3802,10 +3804,10 @@ export const openApiSpec = {
           },
           contractEndDate: {
             type: "string",
-            format: "date-time",
+            format: "date",
             description:
-              "Agreed contract deadline. Must be strictly in the future. Legacy alias: maximumEndDate",
-            example: "2026-07-01T00:00:00.000Z",
+              "Agreed contract deadline (YYYY-MM-DD). Stored as 23:59:59.999 Asia/Jerusalem on that day. Must be strictly in the future. Legacy alias: maximumEndDate",
+            example: "2026-07-01",
           },
         },
       },

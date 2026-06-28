@@ -17,6 +17,9 @@ if (!hasTestDatabase) {
   const { signAccessToken } = await import("../../common/utils/jwt.js");
   const { prisma } = await import("../../lib/prisma.js");
   const { default: app } = await import("../../server.js");
+  const { contractEndDateDaysAhead } = await import(
+    "../../common/utils/contractDeadline.js"
+  );
 
   const runId = `wallet_${Date.now()}`;
   const password = "TestPass@123";
@@ -189,7 +192,7 @@ if (!hasTestDatabase) {
       const postId = await createServicePost(provider.id);
       const duration = 3;
 
-      const contractEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const contractEndDate = contractEndDateDaysAhead(7);
 
       const created = await request(app)
         .post("/exchanges/request")
@@ -236,7 +239,7 @@ if (!hasTestDatabase) {
       await createWelcomeBonus(requester.id);
 
       const postId = await createServicePost(provider.id);
-      const contractEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      const contractEndDate = contractEndDateDaysAhead(7);
       const created = await request(app)
         .post("/exchanges/request")
         .set(authHeader(requester.token))

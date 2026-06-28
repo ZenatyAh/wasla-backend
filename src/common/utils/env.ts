@@ -40,3 +40,7 @@ export const RECOMMENDER_TIMEOUT_MS = Number(
 export const RECOMMENDER_ENABLED = Boolean(
   RECOMMENDER_URL && RECOMMENDER_API_KEY,
 );
+
+/** IANA timezone for contract deadline end-of-day (23:59:59.999). */
+export const CONTRACT_DEADLINE_TIMEZONE =
+  process.env.CONTRACT_DEADLINE_TIMEZONE?.trim() || "Asia/Jerusalem";

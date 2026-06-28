@@ -24,6 +24,9 @@ if (!hasTestDatabase) {
   const { prisma } = await import("../../lib/prisma.js");
   const { default: app } = await import("../../server.js");
   const { initSocket } = await import("../../realtime/socket.js");
+  const { contractEndDateDaysAhead } = await import(
+    "../../common/utils/contractDeadline.js"
+  );
 
   const runId = `${Date.now()}_notif_socket`;
   const password = "TestPass@123";
@@ -249,9 +252,7 @@ if (!hasTestDatabase) {
         type: string;
       }>(providerSocket!, "contract:notification:new");
 
-      const contractEndDate = new Date(
-        Date.now() + 7 * 24 * 60 * 60 * 1000,
-      ).toISOString();
+      const contractEndDate = contractEndDateDaysAhead(7);
 
       const requestResponse = await request(app)
         .post("/exchanges/request")

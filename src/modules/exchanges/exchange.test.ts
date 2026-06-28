@@ -22,6 +22,9 @@ if (!hasTestDatabase) {
   const { default: app } = await import("../../server.js");
   const { resolveExpiredContracts } = await import("./exchanges.service.js");
   const { notifyApproachingDeadlines } = await import("./exchanges.service.js");
+  const { contractEndDateDaysAhead, parseContractEndDate } = await import(
+    "../../common/utils/contractDeadline.js"
+  );
 
   const runId = `exch_${Date.now()}`;
   const password = "TestPass@123";
@@ -87,7 +90,7 @@ if (!hasTestDatabase) {
     postId: number,
     duration: number,
   ) => {
-    const contractEndDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const contractEndDate = contractEndDateDaysAhead(7);
     const response = await request(app)
       .post("/exchanges/request")
       .set(authHeader(requester.token))
@@ -135,12 +138,11 @@ if (!hasTestDatabase) {
       });
 
       it("creates a request as PENDING without deducting credits", async () => {
-        const response = await createPendingExchange(
-          requester,
-          provider.id,
-          postId,
-          duration,
-        );
+        const contractEndDate = contractEndDateDaysAhead(7);
+        const response = await request(app)
+          .post("/exchanges/request")
+          .set(authHeader(requester.token))
+          .send({ postId, providerId: provider.id, duration, contractEndDate });
 
         assert.equal(response.status, 201);
         assert.equal(response.body.exchange.status, "PENDING");
@@ -149,6 +151,15 @@ if (!hasTestDatabase) {
         assert.equal(response.body.exchange.providerId, provider.id);
         assert.ok(response.body.exchange.contractEndDate);
         exchangeId = response.body.exchange.id;
+
+        const stored = await prisma.serviceExchange.findUniqueOrThrow({
+          where: { id: exchangeId },
+          select: { maximum_end_date: true },
+        });
+        assert.equal(
+          stored.maximum_end_date.getTime(),
+          parseContractEndDate(contractEndDate).getTime(),
+        );
 
         // Critical: requesting must NOT touch the requester's balance.
         const balances = await getBalances(requester.id);
