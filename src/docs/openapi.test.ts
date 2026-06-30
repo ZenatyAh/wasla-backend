@@ -369,6 +369,6 @@ describe("OpenAPI spec", () => {
     assert.match(acceptPut.description, /ARCHIVED/);
     assert.match(acceptPut.description, /REJECTED/);
     assert.match(requestPost.description, /PUBLISHED/);
-    assert.match(requestPost.description, /owned by `providerId`/);
+    assert.match(requestPost.description, /owned by the requester \(not the provider\)/);
   });
 });

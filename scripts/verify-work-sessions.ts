@@ -52,10 +52,10 @@ async function main() {
   });
   const post = await prisma.post.create({
     data: {
-      user_id: provider.id,
+      user_id: requester.id,
       title: "WS test",
       description: "d",
-      category: "OFFER",
+      category: "REQUEST",
       service_mode: "ONLINE",
       assigned_time_credits: 5,
     },

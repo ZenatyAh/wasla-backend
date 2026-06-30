@@ -99,13 +99,13 @@ const main = async () => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${provider.token}`,
+      Authorization: `Bearer ${requester.token}`,
     },
     body: JSON.stringify({
       title: `Notification test post ${RUN_ID}`,
       description:
         "Production notification verification post for contract lifecycle events.",
-      category: "OFFER",
+      category: "REQUEST",
       serviceMode: "ONLINE",
       assignedTimeCredits: 1,
     }),

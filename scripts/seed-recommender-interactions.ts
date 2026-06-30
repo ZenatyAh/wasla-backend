@@ -142,12 +142,17 @@ const planInteractions = (exportData: ExportPayload, allowedUserIds: number[]) =
   while (applies.length < applyTarget && guard < applyTarget * 30) {
     guard++;
     const userId = userIds[Math.floor(rng() * userIds.length)]!;
-    const post = posts[Math.floor(rng() * posts.length)]!;
-    if (post.ownerId === userId) continue;
-    const key = `${userId}:${post.id}`;
+    const ownedPosts = posts.filter((p) => p.ownerId === userId);
+    if (ownedPosts.length === 0) continue;
+    const post = ownedPosts[Math.floor(rng() * ownedPosts.length)]!;
+    const providerCandidates = userIds.filter((id) => id !== userId);
+    if (providerCandidates.length === 0) continue;
+    const providerId =
+      providerCandidates[Math.floor(rng() * providerCandidates.length)]!;
+    const key = `${userId}:${post.id}:${providerId}`;
     if (seenApplies.has(key)) continue;
     seenApplies.add(key);
-    applies.push({ userId, postId: post.id, providerId: post.ownerId });
+    applies.push({ userId, postId: post.id, providerId });
   }
 
   return { saves, applies, posts, userIds };

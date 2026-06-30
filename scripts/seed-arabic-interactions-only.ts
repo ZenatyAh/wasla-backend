@@ -72,38 +72,52 @@ const main = async () => {
     }
 
     const { userId, token } = session;
-    const offset = (i * 3) % Math.max(posts.length - INTERACTIONS_PER_USER, 1);
-    const targets = posts
-      .filter((p) => p.ownerId !== userId)
-      .slice(offset, offset + INTERACTIONS_PER_USER);
+    const ownPosts = posts.filter((p) => p.ownerId === userId);
+    const othersPosts = posts.filter((p) => p.ownerId !== userId);
+    const providerIds = [...new Set(posts.map((p) => p.ownerId))].filter(
+      (id) => id !== userId,
+    );
+    if (othersPosts.length === 0 || ownPosts.length === 0 || providerIds.length === 0) {
+      continue;
+    }
 
-    for (let j = 0; j < targets.length; j++) {
-      const target = targets[j]!;
-      if (j % 2 === 0) {
-        const r = await fetch(`${BASE_URL}/posts/${target.id}/save`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (r.ok) saves++;
-      } else {
-        const r = await fetch(`${BASE_URL}/exchanges/request`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            postId: target.id,
-            providerId: target.ownerId,
-            duration: 1,
-            contractEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          }),
-        });
-        if (r.ok) applies++;
-      }
+    const saveOffset = (i * 3) % Math.max(othersPosts.length - INTERACTIONS_PER_USER, 1);
+    const saveTargets = othersPosts.slice(saveOffset, saveOffset + INTERACTIONS_PER_USER);
+    const applyOffset = (i * 5) % Math.max(ownPosts.length - INTERACTIONS_PER_USER, 1);
+    const applyTargets = ownPosts.slice(applyOffset, applyOffset + INTERACTIONS_PER_USER);
+
+    for (let j = 0; j < saveTargets.length; j++) {
+      const target = saveTargets[j]!;
+      const r = await fetch(`${BASE_URL}/posts/${target.id}/save`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) saves++;
       await sleep(200);
     }
-    console.log(`[interactions] user ${userId}: ${targets.length} attempts`);
+
+    for (let j = 0; j < applyTargets.length; j++) {
+      const target = applyTargets[j]!;
+      const providerId = providerIds[(userId + j) % providerIds.length]!;
+      const r = await fetch(`${BASE_URL}/exchanges/request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          postId: target.id,
+          providerId,
+          duration: 1,
+          contractEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        }),
+      });
+      if (r.ok) applies++;
+      await sleep(200);
+    }
+    console.log(
+      `[interactions] user ${userId}: ${saveTargets.length + applyTargets.length} attempts`,
+    );
     await sleep(2_000);
   }
 

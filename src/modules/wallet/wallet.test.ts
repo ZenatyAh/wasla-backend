@@ -189,7 +189,7 @@ if (!hasTestDatabase) {
       await createWelcomeBonus(requester.id);
       await createWelcomeBonus(provider.id);
 
-      const postId = await createServicePost(provider.id);
+      const postId = await createServicePost(requester.id);
       const duration = 3;
 
       const contractEndDate = contractEndDateDaysAhead(7);
@@ -238,7 +238,7 @@ if (!hasTestDatabase) {
       const provider = await createActor("filters_provider", 5);
       await createWelcomeBonus(requester.id);
 
-      const postId = await createServicePost(provider.id);
+      const postId = await createServicePost(requester.id);
       const contractEndDate = contractEndDateDaysAhead(7);
       const created = await request(app)
         .post("/exchanges/request")

@@ -1765,8 +1765,8 @@ export const openApiSpec = {
         tags: ["Exchanges"],
         summary: "Request a service exchange (create contract)",
         description:
-          "Creates a PENDING contract. No time credits are deducted at this stage. The requester is the authenticated user; you cannot request a service from yourself, and you must currently hold at least `duration` available credits. " +
-          "The post must be `PUBLISHED` and owned by `providerId`. " +
+          "Creates a PENDING contract. No time credits are deducted at this stage. The authenticated user is the requester and must own the post; you cannot request a service from yourself, and you must currently hold at least `duration` available credits. " +
+          "The post must be `PUBLISHED` and owned by the requester (not the provider). " +
           "`contractEndDate` (legacy alias `maximumEndDate`) must be **YYYY-MM-DD**; stored as 23:59:59.999 Asia/Jerusalem on that day. " +
           contractNotificationDelivery("EXCHANGE_REQUESTED", "provider"),
         security: [{ bearerAuth: [] }],

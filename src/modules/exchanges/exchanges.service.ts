@@ -230,8 +230,8 @@ export const requestExchange = async (
   if (post.status !== "PUBLISHED") {
     throw new ExchangeError("This post is no longer available for requests", 400);
   }
-  if (post.user_id !== data.providerId) {
-    throw new ExchangeError("Provider does not own this post", 400);
+  if (post.user_id !== requesterId) {
+    throw new ExchangeError("You do not own this post", 400);
   }
 
   const provider = await prisma.user.findUnique({

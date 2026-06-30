@@ -272,43 +272,58 @@ const seedInteractions = async (
   let appliesOk = 0;
 
   for (const user of users) {
+    const ownPosts = allPostIds.filter((p) => p.ownerId === user.id);
     const othersPosts = allPostIds.filter((p) => p.ownerId !== user.id);
-    if (othersPosts.length === 0) continue;
+    const providerCandidates = users.filter((candidate) => candidate.id !== user.id);
+    if (othersPosts.length === 0 || ownPosts.length === 0 || providerCandidates.length === 0) {
+      continue;
+    }
 
-    const offset = (user.id * 3) % Math.max(othersPosts.length - INTERACTIONS_PER_USER, 1);
-    const targets = othersPosts.slice(offset, offset + INTERACTIONS_PER_USER);
+    const saveOffset =
+      (user.id * 3) % Math.max(othersPosts.length - INTERACTIONS_PER_USER, 1);
+    const saveTargets = othersPosts.slice(saveOffset, saveOffset + INTERACTIONS_PER_USER);
+    const applyOffset =
+      (user.id * 5) % Math.max(ownPosts.length - INTERACTIONS_PER_USER, 1);
+    const applyTargets = ownPosts.slice(applyOffset, applyOffset + INTERACTIONS_PER_USER);
 
-    for (let i = 0; i < targets.length; i++) {
-      const target = targets[i]!;
-      const isSave = i % 2 === 0;
-
+    for (let i = 0; i < saveTargets.length; i++) {
+      const target = saveTargets[i]!;
       try {
-        if (isSave) {
-          const response = await withRetry(`save ${user.id}->${target.id}`, () =>
-            fetch(`${BASE_URL}/posts/${target.id}/save`, {
-              method: "POST",
-              headers: { Authorization: `Bearer ${user.token}` },
+        const response = await withRetry(`save ${user.id}->${target.id}`, () =>
+          fetch(`${BASE_URL}/posts/${target.id}/save`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${user.token}` },
+          }),
+        );
+        if (response.ok) savesOk++;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[gaza-seed] interaction skip: ${msg}`);
+      }
+      await sleep(250);
+    }
+
+    for (let i = 0; i < applyTargets.length; i++) {
+      const target = applyTargets[i]!;
+      const provider =
+        providerCandidates[(user.id + i) % providerCandidates.length]!;
+      try {
+        const response = await withRetry(`apply ${user.id}->${provider.id}`, () =>
+          fetch(`${BASE_URL}/exchanges/request`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${user.token}`,
+            },
+            body: JSON.stringify({
+              postId: target.id,
+              providerId: provider.id,
+              duration: 1,
+              contractEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
             }),
-          );
-          if (response.ok) savesOk++;
-        } else {
-          const response = await withRetry(`apply ${user.id}->${target.id}`, () =>
-            fetch(`${BASE_URL}/exchanges/request`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${user.token}`,
-              },
-              body: JSON.stringify({
-                postId: target.id,
-                providerId: target.ownerId,
-                duration: 1,
-                contractEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-              }),
-            }),
-          );
-          if (response.ok) appliesOk++;
-        }
+          }),
+        );
+        if (response.ok) appliesOk++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(`[gaza-seed] interaction skip: ${msg}`);

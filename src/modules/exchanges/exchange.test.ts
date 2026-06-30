@@ -134,7 +134,7 @@ if (!hasTestDatabase) {
       before(async () => {
         requester = await createActor("hp_requester", 5);
         provider = await createActor("hp_provider", 5);
-        postId = await createServicePost(provider.id);
+        postId = await createServicePost(requester.id);
       });
 
       it("creates a request as PENDING without deducting credits", async () => {
@@ -249,7 +249,7 @@ if (!hasTestDatabase) {
       before(async () => {
         requester = await createActor("val_requester", 2);
         provider = await createActor("val_provider", 5);
-        postId = await createServicePost(provider.id);
+        postId = await createServicePost(requester.id);
       });
 
       it("rejects requesting a service from yourself (400)", async () => {
@@ -293,8 +293,8 @@ if (!hasTestDatabase) {
         requester = await createActor("acc_requester", 3);
         providerA = await createActor("acc_providerA", 5);
         providerB = await createActor("acc_providerB", 5);
-        postA = await createServicePost(providerA.id);
-        postB = await createServicePost(providerB.id);
+        postA = await createServicePost(requester.id);
+        postB = await createServicePost(requester.id);
 
         const a = await createPendingExchange(requester, providerA.id, postA, 3);
         const b = await createPendingExchange(requester, providerB.id, postB, 3);
@@ -341,7 +341,7 @@ if (!hasTestDatabase) {
       before(async () => {
         requester = await createActor("st_requester", 5);
         provider = await createActor("st_provider", 5);
-        postId = await createServicePost(provider.id);
+        postId = await createServicePost(requester.id);
         const created = await createPendingExchange(
           requester,
           provider.id,
@@ -393,7 +393,7 @@ if (!hasTestDatabase) {
       before(async () => {
         requester = await createActor("auth_requester", 5);
         provider = await createActor("auth_provider", 5);
-        postId = await createServicePost(provider.id);
+        postId = await createServicePost(requester.id);
         const created = await createPendingExchange(
           requester,
           provider.id,
@@ -446,8 +446,8 @@ if (!hasTestDatabase) {
         requester = await createActor("race_requester", 3);
         providerA = await createActor("race_providerA", 5);
         providerB = await createActor("race_providerB", 5);
-        const postA = await createServicePost(providerA.id);
-        const postB = await createServicePost(providerB.id);
+        const postA = await createServicePost(requester.id);
+        const postB = await createServicePost(requester.id);
 
         const a = await createPendingExchange(requester, providerA.id, postA, 3);
         const b = await createPendingExchange(requester, providerB.id, postB, 3);
@@ -492,7 +492,7 @@ if (!hasTestDatabase) {
       before(async () => {
         requester = await createActor("cancp_requester", 5);
         provider = await createActor("cancp_provider", 5);
-        const postId = await createServicePost(provider.id);
+        const postId = await createServicePost(requester.id);
         const created = await createPendingExchange(
           requester,
           provider.id,
@@ -525,7 +525,7 @@ if (!hasTestDatabase) {
       before(async () => {
         requester = await createActor("cancr_requester", 5);
         provider = await createActor("cancr_provider", 5);
-        const postId = await createServicePost(provider.id);
+        const postId = await createServicePost(requester.id);
         const created = await createPendingExchange(
           requester,
           provider.id,
@@ -567,7 +567,7 @@ if (!hasTestDatabase) {
       before(async () => {
         requester = await createActor("disp_requester", 5);
         provider = await createActor("disp_provider", 5);
-        const postId = await createServicePost(provider.id);
+        const postId = await createServicePost(requester.id);
         const created = await createPendingExchange(
           requester,
           provider.id,
@@ -608,7 +608,7 @@ if (!hasTestDatabase) {
         requester = await createActor("list_requester", 10);
         provider = await createActor("list_provider", 5);
         outsider = await createActor("list_outsider", 5);
-        const postId = await createServicePost(provider.id);
+        const postId = await createServicePost(requester.id);
         const created = await createPendingExchange(
           requester,
           provider.id,
@@ -675,7 +675,7 @@ if (!hasTestDatabase) {
           sessions?: Array<{ hours: number; status: "PENDING_CONFIRMATION" | "CONFIRMED" | "REJECTED" }>;
         } = {},
       ) => {
-        const postId = await createServicePost(provider.id);
+        const postId = await createServicePost(requester.id);
         const created = await createPendingExchange(
           requester,
           provider.id,
@@ -845,7 +845,7 @@ if (!hasTestDatabase) {
       it("rejects requests when the post is not PUBLISHED", async () => {
         const requester = await createActor("arch_req_blocked", 5);
         const provider = await createActor("arch_prov_blocked", 5);
-        const postId = await createServicePost(provider.id);
+        const postId = await createServicePost(requester.id);
 
         await prisma.post.update({
           where: { id: postId },
@@ -862,15 +862,15 @@ if (!hasTestDatabase) {
         assert.match(response.body.message, /no longer available/i);
       });
 
-      it("rejects requests when provider does not own the post", async () => {
+      it("rejects requests when the requester does not own the post", async () => {
         const requester = await createActor("arch_req_owner", 5);
         const provider = await createActor("arch_prov_owner", 5);
-        const otherProvider = await createActor("arch_other_prov", 5);
-        const postId = await createServicePost(provider.id);
+        const otherRequester = await createActor("arch_other_req", 5);
+        const postId = await createServicePost(otherRequester.id);
 
         const response = await createPendingExchange(
           requester,
-          otherProvider.id,
+          provider.id,
           postId,
           3,
         );
@@ -879,27 +879,27 @@ if (!hasTestDatabase) {
       });
 
       it("accepting one pending contract rejects other pending contracts on the same post", async () => {
-        const requesterA = await createActor("arch_req_a", 5);
-        const requesterB = await createActor("arch_req_b", 5);
-        const provider = await createActor("arch_prov_compete", 5);
-        const postId = await createServicePost(provider.id);
+        const requester = await createActor("arch_req_compete", 5);
+        const providerA = await createActor("arch_prov_a", 5);
+        const providerB = await createActor("arch_prov_b", 5);
+        const postId = await createServicePost(requester.id);
 
         const first = await createPendingExchange(
-          requesterA,
-          provider.id,
+          requester,
+          providerA.id,
           postId,
           3,
         );
         const second = await createPendingExchange(
-          requesterB,
-          provider.id,
+          requester,
+          providerB.id,
           postId,
           3,
         );
 
         const acceptResponse = await request(app)
           .put(`/exchanges/${first.body.exchange.id}/accept`)
-          .set(authHeader(provider.token));
+          .set(authHeader(providerA.token));
         assert.equal(acceptResponse.status, 200);
 
         const winner = await prisma.serviceExchange.findUniqueOrThrow({
@@ -923,7 +923,7 @@ if (!hasTestDatabase) {
       it("notifies provider and consumer with extension guidance once per deadline", async () => {
         const requester = await createActor("deadline_req", 10);
         const provider = await createActor("deadline_prov", 5);
-        const postId = await createServicePost(provider.id);
+        const postId = await createServicePost(requester.id);
         const created = await createPendingExchange(requester, provider.id, postId, 3);
         const exchangeId = created.body.exchange.id;
 

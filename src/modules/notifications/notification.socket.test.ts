@@ -129,10 +129,10 @@ if (!hasTestDatabase) {
 
       const servicePost = await prisma.post.create({
         data: {
-          user_id: providerId,
+          user_id: requesterId,
           title: "Notification socket service post",
           description: "Service post for contract notification test",
-          category: "OFFER",
+          category: "REQUEST",
           service_mode: "ONLINE",
           assigned_time_credits: 3,
         },

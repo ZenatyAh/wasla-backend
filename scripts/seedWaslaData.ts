@@ -608,20 +608,25 @@ const seedInteractions = async (
 
   for (let i = 0; i < targetCount; i++) {
     const post = pick(posts, Math.floor(rng() * posts.length));
-    const actorId = pick(
-      userIds.filter((id) => id !== post.userId),
-      i,
-    );
     const actionRoll = rng();
     const timestamp = randomTimestamp(rng);
 
     if (actionRoll < 0.45) {
+      const actorId = pick(
+        userIds.filter((id) => id !== post.userId),
+        i,
+      );
       saves.push({ user_id: actorId, post_id: post.id, created_at: timestamp });
     } else {
+      const requesterId = post.userId;
+      const providerId = pick(
+        userIds.filter((id) => id !== requesterId),
+        i,
+      );
       applies.push({
         post_id: post.id,
-        provider_id: post.userId,
-        consumer_id: actorId,
+        provider_id: providerId,
+        consumer_id: requesterId,
         time_credits: 1,
         created_at: timestamp,
       });
@@ -913,15 +918,15 @@ const seedInteractionsApi = async (
   const targetCount = Math.min(800, createdPosts.length * 2);
 
   for (let i = 0; i < targetCount; i++) {
-    const post = pick(createdPosts, Math.floor(rng() * createdPosts.length));
-    const actor = pick(
-      users.filter((u) => u.id !== post.userId),
-      i,
-    );
-    if (!actor) continue;
-
     try {
       if (i % 2 === 0) {
+        const post = pick(createdPosts, Math.floor(rng() * createdPosts.length));
+        const actor = pick(
+          users.filter((u) => u.id !== post.userId),
+          i,
+        );
+        if (!actor) continue;
+
         const response = await withRetry(`save ${actor.id}->${post.id}`, () =>
           fetch(`${BASE_URL}/posts/${post.id}/save`, {
             method: "POST",
@@ -930,16 +935,29 @@ const seedInteractionsApi = async (
         );
         if (response.ok) savesOk++;
       } else {
-        const response = await withRetry(`apply ${actor.id}->${post.id}`, () =>
+        const requester = pick(users, i);
+        if (!requester) continue;
+        const ownedPosts = createdPosts.filter((p) => p.userId === requester.id);
+        if (ownedPosts.length === 0) continue;
+        const post = pick(ownedPosts, Math.floor(rng() * ownedPosts.length));
+        const provider = pick(
+          users.filter((u) => u.id !== requester.id),
+          i,
+        );
+        if (!provider) continue;
+
+        const response = await withRetry(
+          `apply ${requester.id}->${provider.id}@${post.id}`,
+          () =>
           fetch(`${BASE_URL}/exchanges/request`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${actor.token}`,
+              Authorization: `Bearer ${requester.token}`,
             },
             body: JSON.stringify({
               postId: post.id,
-              providerId: post.userId,
+              providerId: provider.id,
               duration: 1,
               contractEndDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
             }),
