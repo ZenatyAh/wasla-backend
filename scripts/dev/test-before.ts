@@ -1,6 +1,6 @@
 import "dotenv/config";
 import bcrypt from "bcrypt";
-import { prisma } from "./src/lib/prisma.js";
+import { prisma } from "../../src/lib/prisma.js";
 
 const runId = Date.now().toString();
 const password = "TestPass@123";
