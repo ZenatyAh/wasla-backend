@@ -1,5 +1,5 @@
 import "dotenv/config";
-import app from "./src/server.js";
+import app from "../../src/server.js";
 import request from "supertest";
 
 (async () => {
